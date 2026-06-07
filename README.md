@@ -139,7 +139,7 @@ For the map to be accurate, OctoMap needs to know **where the camera was** when 
 
 The combined view shows all three systems working together: Gazebo simulation (right), keyboard controller with real-time position tracking (top-right), RViz2 with OctoMap and point cloud overlay (left).
 
-![Full System — Gazebo + RViz2 + Keyboard Controller running simultaneously](Demo_Pic/Screenshot%20from%202026-06-08%2002-06-28.png)
+![Full System — Gazebo + RViz2 + Keyboard Controller running simultaneously](Demo_Pic/Ref.png)
 
 ---
 

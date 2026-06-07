@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Week 0 - Drone Simulation Environment Setup</title>
+<title>Drone Simulation — Environment Setup & Perception</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -53,14 +53,14 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 
 <!-- SLIDE 1: Title -->
 <div class="slide active" id="s1">
-<p class="subtitle">BTP Project — Week 0 Report</p>
-<h1>Autonomous Drone Simulation<br>Environment Setup & Validation</h1>
-<p style="font-size:20px;margin:20px 0 30px">Setting up PX4 SITL + ROS 2 Humble + Gazebo Sim on Ubuntu 22.04</p>
+<p class="subtitle">BTP Project — Progress Report</p>
+<h1>Autonomous Drone Simulation<br>Environment Setup & Perception</h1>
+<p style="font-size:20px;margin:20px 0 30px">PX4 SITL + ROS 2 Humble + Gazebo Garden + Depth Camera Pipeline</p>
 <div>
-<span class="tag">PX4 v1.14</span><span class="tag">ROS 2 Humble</span><span class="tag">Gazebo Sim</span><span class="tag">Ubuntu 22.04</span><span class="tag">Micro-XRCE-DDS</span>
+<span class="tag">PX4 v1.14</span><span class="tag">ROS 2 Humble</span><span class="tag">Gazebo Garden 7.9.0</span><span class="tag">Ubuntu 22.04</span><span class="tag">Micro-XRCE-DDS</span><span class="tag">Depth Camera</span><span class="tag">RViz2</span>
 </div>
-<p style="margin-top:40px;font-size:16px;color:#666">Amit | May 2026</p>
-<div class="slide-num">1 / 11</div>
+<p style="margin-top:40px;font-size:16px;color:#666">Amit | June 2026</p>
+<div class="slide-num">1 / 14</div>
 </div>
 
 <!-- SLIDE 2: Project Overview -->
@@ -83,7 +83,7 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 </ul>
 </div>
 </div>
-<div class="slide-num">2 / 11</div>
+<div class="slide-num">2 / 14</div>
 </div>
 
 <!-- SLIDE 3: Software Stack -->
@@ -94,8 +94,12 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 <tr><td>Operating System</td><td><code>Ubuntu 22.04 LTS (Jammy)</code></td><td>Base development platform</td></tr>
 <tr><td>ROS Distribution</td><td><code>ROS 2 Humble Hawksbill</code></td><td>Robot middleware framework</td></tr>
 <tr><td>Flight Controller</td><td><code>PX4 Autopilot v1.14</code></td><td>Autopilot firmware (SITL mode)</td></tr>
-<tr><td>Simulator</td><td><code>Gazebo Sim (Harmonic)</code></td><td>3D physics simulation</td></tr>
-<tr><td>Bridge Middleware</td><td><code>Micro-XRCE-DDS Agent</code></td><td>PX4 ↔ ROS 2 communication</td></tr>
+<tr><td>Simulator</td><td><code>Gazebo Garden v7.9.0</code></td><td>3D physics simulation</td></tr>
+<tr><td>PX4 ↔ ROS 2 Bridge</td><td><code>Micro-XRCE-DDS Agent v2.4.2</code></td><td>PX4 ↔ ROS 2 communication</td></tr>
+<tr><td>Gazebo ↔ ROS 2 Bridge</td><td><code>ros-gzgarden-bridge v0.244.11</code></td><td>Depth camera topics to ROS 2</td></tr>
+<tr><td>Drone Model</td><td><code>x500_depth (OakD-Lite)</code></td><td>Quadcopter + depth camera sensor</td></tr>
+<tr><td>Visualization</td><td><code>RViz2 (Humble)</code></td><td>3D point cloud visualization</td></tr>
+<tr><td>Python</td><td><code>Python 3.10 + NumPy 2.2.6</code></td><td>Point cloud filtering algorithms</td></tr>
 <tr><td>Message Package</td><td><code>px4_msgs (release/1.14)</code></td><td>PX4 message type definitions</td></tr>
 <tr><td>Build System</td><td><code>colcon + cmake</code></td><td>ROS 2 workspace compilation</td></tr>
 </table>
@@ -106,14 +110,14 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 <tr><td>OS</td><td><code>Ubuntu 20.04 Focal</code></td><td><code>Ubuntu 22.04 LTS Jammy</code></td></tr>
 <tr><td>ROS Version</td><td><code>ROS 1 Noetic (v1.16)</code></td><td><code>ROS 2 Humble Hawksbill</code></td></tr>
 <tr><td>Bridge</td><td><code>MAVROS v2.x</code> (MAVLink protocol)</td><td><code>Micro-XRCE-DDS Agent v2.4.2</code></td></tr>
-<tr><td>Simulator</td><td><code>Gazebo Classic 11</code></td><td><code>Gazebo Sim (Harmonic / Ogre2)</code></td></tr>
+<tr><td>Simulator</td><td><code>Gazebo Classic 11</code></td><td><code>Gazebo Garden v7.9.0 (Ogre2)</code></td></tr>
 <tr><td>PX4 Version</td><td><code>PX4 v1.13</code></td><td><code>PX4 v1.14 (Stable)</code></td></tr>
 <tr><td>Communication</td><td>MAVLink over serial/UDP</td><td>Native DDS over UDP :8888</td></tr>
 <tr><td>Deployment</td><td>Docker containers</td><td>Native installation</td></tr>
 </table>
 <p style="font-size:13px;color:#888;margin-top:8px">MAVROS uses MAVLink as a translation layer. XRCE-DDS communicates directly with PX4's internal uORB message bus — faster, lower latency, and the official PX4 v1.14 recommended approach for ROS 2.</p>
 </div>
-<div class="slide-num">3 / 12</div>
+<div class="slide-num">3 / 14</div>
 </div>
 
 <!-- SLIDE 4: Architecture -->
@@ -152,7 +156,7 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 </ul>
 </div>
 </div>
-<div class="slide-num">4 / 11</div>
+<div class="slide-num">4 / 14</div>
 </div>
 
 <!-- SLIDE 5: Gazebo World -->
@@ -165,7 +169,7 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 <li><strong>Dimensions:</strong> 10m × 8m × 3m</li>
 <li><strong>Walls:</strong> Wireframe visualization (cyan)</li>
 <li><strong>Physics:</strong> ODE solver, 250 Hz step rate</li>
-<li><strong>Drone Model:</strong> x500 quadcopter</li>
+<li><strong>Drone Model:</strong> x500_depth quadcopter (with OakD-Lite depth camera)</li>
 <li><strong>File:</strong> <code>indoor_10x8x3.sdf</code></li>
 </ul>
 <div class="highlight-box" style="margin-top:20px">
@@ -176,7 +180,7 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 <img src="Gazebo_Sim.png" alt="Gazebo Simulation">
 </div>
 </div>
-<div class="slide-num">5 / 11</div>
+<div class="slide-num">5 / 14</div>
 </div>
 
 <!-- SLIDE 6: Topic Verification -->
@@ -197,7 +201,7 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 <img src="Ros2_Topic_List.png" alt="ROS 2 Topic List">
 </div>
 </div>
-<div class="slide-num">6 / 11</div>
+<div class="slide-num">6 / 14</div>
 </div>
 
 <!-- SLIDE 7: Parameter Verification -->
@@ -220,7 +224,7 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 </table>
 </div>
 </div>
-<div class="slide-num">7 / 11</div>
+<div class="slide-num">7 / 14</div>
 </div>
 
 <!-- SLIDE 8: Hover Test Results -->
@@ -237,7 +241,7 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 <h3 style="color:#00c8ff;margin-top:0">📊 Analysis</h3>
 <p style="font-size:15px"><strong>Horizontal precision is excellent</strong> (~4 cm drift), confirming stable position control. The Z-axis shows higher variance (~73 cm) which is expected during the initial takeoff transient — the drone climbs from 0m to 2.5m, and this altitude change dominates the standard deviation. Steady-state Z-hold is much tighter.</p>
 </div>
-<div class="slide-num">8 / 11</div>
+<div class="slide-num">8 / 14</div>
 </div>
 
 <!-- SLIDE 9: Data & Logs -->
@@ -268,57 +272,125 @@ ul li::before{content:"▸ ";color:#00c8ff;font-weight:bold}
 <p style="font-size:14px">Can be analyzed with <code>flight_review</code> or <code>pyulog</code>.</p>
 </div>
 </div>
-<div class="slide-num">9 / 11</div>
+<div class="slide-num">9 / 14</div>
 </div>
 
 <!-- SLIDE 10: Live Demo Commands -->
 <div class="slide" id="s10">
-<h2>🖥️ Live Demo — Step-by-Step Commands</h2>
-<p style="margin-bottom:12px">Three terminals needed. Run in this exact order:</p>
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
-<div>
-<div class="cmd-label">Terminal 1 — Bridge</div>
-<div class="cmd-block">cd ~/Micro-XRCE-DDS-Agent/build<br>MicroXRCEAgent udp4 -p 8888</div>
-<p class="small" style="margin-top:6px">Wait for "Agent running" message</p>
+<h2>🖥️ Live Demo — One-Command Launch</h2>
+<p style="margin-bottom:12px">The entire 6-terminal stack launches with a single command:</p>
+<div class="cmd-block" style="font-size:18px;text-align:center;padding:20px">~/Desktop/Drone_IP/launch_sim.sh</div>
+<p style="margin:16px 0 12px">This automatically opens 6 terminals:</p>
+<table>
+<tr><th>Terminal</th><th>Process</th><th>Purpose</th></tr>
+<tr><td>T1</td><td><code>MicroXRCEAgent</code></td><td>PX4 ↔ ROS 2 bridge</td></tr>
+<tr><td>T2</td><td><code>PX4 SITL + Gazebo</code></td><td>Flight controller + 3D simulator</td></tr>
+<tr><td>T3</td><td><code>keyboard_control.py</code></td><td>WASD drone teleoperation</td></tr>
+<tr><td>T4</td><td><code>ros_gz_bridge</code></td><td>Gazebo depth topics → ROS 2</td></tr>
+<tr><td>T5</td><td><code>pointcloud_filter.py</code></td><td>Voxel grid + outlier removal</td></tr>
+<tr><td>T6</td><td><code>RViz2</code></td><td>3D point cloud visualization</td></tr>
+</table>
+<div class="highlight-box" style="margin-top:12px">
+<p style="font-size:14px">The script auto-kills stale processes, copies the world SDF, and handles all timing between components. Use <code>--auto</code> flag for autonomous waypoint mode instead of keyboard.</p>
 </div>
-<div>
-<div class="cmd-label">Terminal 2 — PX4 + Gazebo</div>
-<div class="cmd-block">cd ~/PX4-Autopilot<br>PX4_GZ_WORLD=indoor_10x8x3 \<br>make px4_sitl gz_x500</div>
-<p class="small" style="margin-top:6px">Wait for "Ready for takeoff!"</p>
-</div>
-<div>
-<div class="cmd-label">Terminal 3 — ROS 2</div>
-<div class="cmd-block">cd ~/px4_ros_ws<br>source install/setup.bash<br>ros2 topic list<br>ros2 topic hz /fmu/out/sensor_combined</div>
-<p class="small" style="margin-top:6px">Verify ~250 Hz output</p>
-</div>
-</div>
-<div class="highlight-box" style="margin-top:16px">
-<h3 style="color:#00c8ff;margin-top:0">Takeoff & Hover Demo</h3>
-<div class="cmd-block" style="background:#0a0a1a">
-<span style="color:#888"># In Terminal 2 (pxh> prompt):</span><br>
-commander takeoff<br>
-<span style="color:#888"># Wait 30 seconds, then:</span><br>
-param show MPC_ACC_HOR_MAX<br>
-commander land
-</div>
-</div>
-<div class="slide-num">10 / 11</div>
+<div class="slide-num">10 / 14</div>
 </div>
 
-<!-- SLIDE 11: Summary -->
+<!-- SLIDE 11: Perception Pipeline -->
 <div class="slide" id="s11">
-<h2>✅ Week 0 — Summary</h2>
+<h2>Phase 1 — Perception Pipeline</h2>
+<p style="margin-bottom:16px">Added depth sensing to the drone. It can now <strong>see</strong> obstacles in real-time.</p>
+<div class="arch-flow">
+<div class="arch-box">📷 OakD-Lite<br><span class="small">Depth Camera</span></div>
+<div class="arch-arrow">→</div>
+<div class="arch-box">🌉 GZ Bridge<br><span class="small">ros_gz_bridge</span></div>
+<div class="arch-arrow">→</div>
+<div class="arch-box">🔬 Filter Node<br><span class="small">Voxel + SOR</span></div>
+<div class="arch-arrow">→</div>
+<div class="arch-box" style="border-color:rgba(0,255,100,0.4);background:rgba(0,255,100,0.1);color:#00ff88">👁️ RViz2<br><span class="small">3D Visualization</span></div>
+</div>
+<div class="grid2" style="margin-top:20px">
+<div class="card">
+<h3>🔬 Point Cloud Filter</h3>
+<ul>
+<li><strong>Voxel Grid:</strong> divides space into 8cm cubes, averages points per cube</li>
+<li><strong>Statistical Outlier Removal:</strong> removes noisy phantom points</li>
+<li><strong>Result:</strong> 307,200 raw → ~176 filtered points per frame</li>
+</ul>
+</div>
+<div class="card">
+<h3>📊 Depth Camera Specs</h3>
+<table style="font-size:14px">
+<tr><td>Model</td><td><code>OakD-Lite (simulated)</code></td></tr>
+<tr><td>Frame Rate</td><td><code>~30 fps</code></td></tr>
+<tr><td>Resolution</td><td><code>640 × 480</code></td></tr>
+<tr><td>Max Range</td><td><code>8.0 m</code></td></tr>
+<tr><td>Mounting</td><td><code>Front-facing on x500_depth</code></td></tr>
+</table>
+</div>
+</div>
+<div class="slide-num">11 / 14</div>
+</div>
+
+<!-- SLIDE 12: New Topics -->
+<div class="slide" id="s12">
+<h2>New ROS 2 Topics — Depth Camera</h2>
+<p style="margin-bottom:16px">The Gazebo-to-ROS 2 bridge exposes 3 new topics from the depth camera:</p>
+<table>
+<tr><th>Topic</th><th>Message Type</th><th>Rate</th><th>Purpose</th></tr>
+<tr><td><code>/depth_camera</code></td><td><code>sensor_msgs/Image</code></td><td>~30 Hz</td><td>Raw depth image (distance per pixel)</td></tr>
+<tr><td><code>/depth_camera/points</code></td><td><code>sensor_msgs/PointCloud2</code></td><td>~30 Hz</td><td>Raw 3D point cloud (307,200 points)</td></tr>
+<tr><td><code>/depth_camera/points_filtered</code></td><td><code>sensor_msgs/PointCloud2</code></td><td>~30 Hz</td><td>Filtered point cloud (~176 points)</td></tr>
+<tr><td><code>/camera_info</code></td><td><code>sensor_msgs/CameraInfo</code></td><td>~30 Hz</td><td>Camera intrinsics (focal length, etc.)</td></tr>
+</table>
 <div class="highlight-box" style="margin-top:20px">
-<p>Successfully established a fully functional <strong>PX4 v1.14 + ROS 2 Humble + Gazebo Sim</strong> simulation pipeline natively on <strong>Ubuntu 22.04</strong>. All sensor bridges are verified via <strong>Micro-XRCE-DDS Agent</strong>, baseline flight data has been recorded, and the custom 10×8×3m indoor world is operational.</p>
-<p style="margin-top:16px">The environment is ready for autonomous flight algorithm development.</p>
+<h3 style="color:#00c8ff;margin-top:0">🔗 Bridge Direction</h3>
+<p style="font-size:15px"><strong>Gazebo Garden</strong> publishes depth data internally using <code>gz.msgs.PointCloudPacked</code>. The <code>ros-gzgarden-bridge v0.244.11</code> converts these into standard ROS 2 <code>sensor_msgs</code> types so our Python nodes and RViz2 can consume them.</p>
 </div>
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:30px">
-<div class="card metric"><div class="value" style="font-size:28px">248.5 Hz</div><div class="label">IMU Frequency ✓</div></div>
-<div class="card metric"><div class="value" style="font-size:28px">11,807</div><div class="label">Odometry Samples ✓</div></div>
-<div class="card metric"><div class="value" style="font-size:28px">0.04 m</div><div class="label">Horizontal Drift ✓</div></div>
+<div class="slide-num">12 / 14</div>
 </div>
-<p style="text-align:center;margin-top:40px;font-size:22px;color:#888">Thank You</p>
-<div class="slide-num">11 / 11</div>
+
+<!-- SLIDE 13: Files Created -->
+<div class="slide" id="s13">
+<h2>📁 Project Files</h2>
+<table>
+<tr><th>File</th><th>Created</th><th>Purpose</th></tr>
+<tr><td><code>indoor_10x8x3.sdf</code></td><td>Week 0</td><td>Custom Gazebo world (10×8×3m room + 3 obstacles + 2 markers)</td></tr>
+<tr><td><code>keyboard_control.py</code></td><td>Week 1</td><td>WASD drone teleoperation via ROS 2 offboard control</td></tr>
+<tr><td><code>offboard_waypoint_nav.py</code></td><td>Week 1</td><td>Automated waypoint navigation (proved blind nav fails)</td></tr>
+<tr><td><code>launch_sim.sh</code></td><td>Week 2</td><td>One-command launcher for all 6 terminals</td></tr>
+<tr><td><code>pointcloud_filter.py</code></td><td>Week 2</td><td>Voxel grid + statistical outlier removal filter node</td></tr>
+<tr><td><code>drone_rviz.rviz</code></td><td>Week 2</td><td>Pre-configured RViz2 layout for point cloud display</td></tr>
+<tr><td><code>presentation.html</code></td><td>Week 0</td><td>This presentation</td></tr>
+</table>
+<div class="slide-num">13 / 14</div>
+</div>
+
+<!-- SLIDE 14: Summary -->
+<div class="slide" id="s14">
+<h2>✅ Progress Summary</h2>
+<div class="highlight-box" style="margin-top:20px">
+<p>Established a complete <strong>PX4 v1.14 + ROS 2 Humble + Gazebo Garden v7.9.0</strong> simulation pipeline with <strong>depth perception</strong> on Ubuntu 22.04. The drone can now see obstacles in real-time via a filtered 3D point cloud visualized in RViz2.</p>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-top:24px">
+<div class="card metric"><div class="value" style="font-size:24px">248.5 Hz</div><div class="label">IMU Rate ✓</div></div>
+<div class="card metric"><div class="value" style="font-size:24px">30 fps</div><div class="label">Depth Camera ✓</div></div>
+<div class="card metric"><div class="value" style="font-size:24px">307K→176</div><div class="label">Filter Ratio ✓</div></div>
+<div class="card metric"><div class="value" style="font-size:24px">6</div><div class="label">Auto Terminals ✓</div></div>
+</div>
+<h3 style="margin-top:30px">🔮 Next Steps — Phase 2 & 3</h3>
+<div class="grid2" style="margin-top:8px">
+<div class="card">
+<h3 style="color:#ffaa00">Phase 2: OctoMap</h3>
+<p style="font-size:14px">Build a persistent 3D occupancy map from point clouds. The drone will remember where obstacles are even after turning away.</p>
+</div>
+<div class="card">
+<h3 style="color:#ffaa00">Phase 3: A* Path Planning</h3>
+<p style="font-size:14px">Compute obstacle-free routes on the occupancy map. Full autonomous navigation from start → destination with 0 collisions.</p>
+</div>
+</div>
+<p style="text-align:center;margin-top:30px;font-size:22px;color:#888">Thank You</p>
+<div class="slide-num">14 / 14</div>
 </div>
 
 <!-- Navigation -->

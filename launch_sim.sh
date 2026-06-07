@@ -148,7 +148,7 @@ sleep 3  # Let controller initialize before starting bridge
 # Without this, your ROS 2 nodes can't see the depth camera data.
 echo "🌉 [Terminal 4] Starting Gazebo → ROS 2 Bridge..."
 open_terminal "T4 — GZ-ROS2 Bridge" \
-    "source /opt/ros/humble/setup.bash && echo '🌉 Bridging Gazebo depth topics to ROS 2...' && ros2 run ros_gz_bridge parameter_bridge /depth_camera@sensor_msgs/msg/Image[gz.msgs.Image /depth_camera/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked /camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
+    "source /opt/ros/humble/setup.bash && echo '🌉 Bridging Gazebo depth topics to ROS 2...' && ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /depth_camera@sensor_msgs/msg/Image[gz.msgs.Image /depth_camera/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked /camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
 
 sleep 3  # Let bridge initialize before starting filter
 
@@ -158,7 +158,7 @@ sleep 3  # Let bridge initialize before starting filter
 FILTER_SCRIPT="$HOME/Desktop/Drone_IP/pointcloud_filter.py"
 echo "🔬 [Terminal 5] Starting Point Cloud Filter..."
 open_terminal "T5 — PointCloud Filter" \
-    "cd $ROS2_WS && source install/setup.bash && echo '🔬 Starting Point Cloud Filter...' && python3 $FILTER_SCRIPT"
+    "cd $ROS2_WS && source install/setup.bash && echo '🔬 Starting Point Cloud Filter...' && python3 $FILTER_SCRIPT --ros-args -p use_sim_time:=true"
 
 sleep 3  # Let filter start before launching RViz2
 
@@ -167,11 +167,29 @@ sleep 3  # Let filter start before launching RViz2
 RVIZ_CONFIG="$HOME/Desktop/Drone_IP/drone_rviz.rviz"
 echo "👁️  [Terminal 6] Starting RViz2 Visualization..."
 open_terminal "T6 — RViz2" \
-    "source /opt/ros/humble/setup.bash && echo '👁️  Launching RViz2...' && rviz2 -d $RVIZ_CONFIG"
+    "source /opt/ros/humble/setup.bash && echo '👁️  Launching RViz2...' && rviz2 -d $RVIZ_CONFIG --ros-args -p use_sim_time:=true"
+
+sleep 2
+
+# --- Terminal 7: TF Broadcaster -----------------------------------------------
+# Publishes drone position as TF transforms so OctoMap knows where
+# the camera is in the world.
+TF_SCRIPT="$HOME/Desktop/Drone_IP/tf_broadcaster.py"
+echo "📍 [Terminal 7] Starting TF Broadcaster..."
+open_terminal "T7 — TF Broadcaster" \
+    "cd $ROS2_WS && source install/setup.bash && echo '📍 Starting TF Broadcaster...' && python3 $TF_SCRIPT --ros-args -p use_sim_time:=true"
+
+sleep 3  # TF must be running before OctoMap starts
+
+# --- Terminal 8: OctoMap Server -----------------------------------------------
+# Builds a persistent 3D occupancy map from the filtered point cloud.
+echo "🗺️  [Terminal 8] Starting OctoMap Server..."
+open_terminal "T8 — OctoMap Server" \
+    "source /opt/ros/humble/setup.bash && echo '🗺️  Starting OctoMap Server...' && ros2 run octomap_server octomap_server_node --ros-args -p use_sim_time:=true -r cloud_in:=/depth_camera/points_filtered -p resolution:=0.1 -p frame_id:=map -p sensor_model.max_range:=8.0 -p sensor_model.min_range:=0.3 -p sensor_model.hit:=0.7 -p sensor_model.miss:=0.4 -p occupancy_min_z:=0.2 -p occupancy_max_z:=2.5"
 
 echo ""
 echo "=============================================="
-echo "  ✅ All 6 terminals launched!"
+echo "  ✅ All 8 terminals launched!"
 echo "=============================================="
 echo ""
 echo "  T1: DDS Bridge        — should show 'Agent running'"
@@ -179,7 +197,9 @@ echo "  T2: PX4 + Gazebo      — wait for 'Ready for takeoff!'"
 echo "  T3: $CONTROLLER_NAME"
 echo "  T4: GZ-ROS2 Bridge    — bridges depth camera to ROS 2"
 echo "  T5: PointCloud Filter — cleans raw point cloud data"
-echo "  T6: RViz2             — 3D point cloud visualization"
+echo "  T6: RViz2             — 3D point cloud + OctoMap visualization"
+echo "  T7: TF Broadcaster    — publishes drone position as TF"
+echo "  T8: OctoMap Server    — builds 3D occupancy map"
 echo ""
 if [[ "$1" != "--auto" ]]; then
     echo "  Controls:"
@@ -192,4 +212,3 @@ fi
 echo ""
 echo "  To stop everything: close the terminal windows or Ctrl+C in each"
 echo "=============================================="
-

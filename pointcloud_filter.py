@@ -92,10 +92,18 @@ class PointCloudFilter(Node):
         )
 
         # ── Publisher: filtered point cloud ──
+        # Use RELIABLE QoS so OctoMap server can subscribe to it.
+        # (OctoMap uses RELIABLE by default — can't receive BEST_EFFORT)
+        pub_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
         self.pub = self.create_publisher(
             PointCloud2,
             '/depth_camera/points_filtered',
-            qos
+            pub_qos
         )
 
         # Stats tracking

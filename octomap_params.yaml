@@ -1,0 +1,14 @@
+# OctoMap Server Parameters for ROS 2
+# Uses wildcard node name to ensure params are loaded regardless of node name
+/**:
+  ros__parameters:
+    resolution: 0.1
+    frame_id: "map"
+    sensor_model.max_range: 8.0
+    sensor_model.min_range: 0.3
+    sensor_model.hit: 0.7
+    sensor_model.miss: 0.4
+    occupancy_min_z: 0.05
+    occupancy_max_z: 3.0
+    filter_ground: false
+    latch: true

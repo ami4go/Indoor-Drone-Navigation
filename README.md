@@ -156,17 +156,73 @@ The combined view shows all three systems working together: Gazebo simulation (r
 | `octomap_params.yaml` | OctoMap server configuration (resolution, range, thresholds) |
 | `drone_rviz.rviz` | RViz2 saved config — point cloud + OctoMap visualization |
 | `analyze_hover.py` | Post-flight hover stability analyzer |
+| `requirements.txt` | Full dependency list with versions and install commands |
 | `presentation.html` | Project presentation slides |
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Installation & Setup
 
-### Prerequisites
-- Ubuntu 22.04 LTS
-- ROS 2 Humble (`sudo apt install ros-humble-desktop`)
-- PX4 Autopilot compiled for SITL
-- Micro-XRCE-DDS Agent built from source
+> **Full dependency details are documented in [`requirements.txt`](requirements.txt)**
+
+### Step 1: Install Ubuntu 22.04 LTS
+Download from [ubuntu.com/download](https://releases.ubuntu.com/22.04/)
+
+### Step 2: Install ROS 2 Humble
+```bash
+# Follow: https://docs.ros.org/en/humble/Installation.html
+sudo apt update && sudo apt install -y ros-humble-desktop
+echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Step 3: Install ROS 2 Packages
+```bash
+sudo apt install -y \
+  ros-humble-ros-gzgarden-bridge \
+  ros-humble-octomap \
+  ros-humble-octomap-server \
+  ros-humble-octomap-msgs \
+  ros-humble-octomap-ros \
+  ros-humble-octomap-rviz-plugins \
+  ros-humble-pcl-ros
+```
+
+### Step 4: Build PX4 Autopilot (SITL)
+```bash
+git clone https://github.com/PX4/PX4-Autopilot.git --recursive -b v1.14.0
+cd PX4-Autopilot
+bash ./Tools/setup/ubuntu.sh
+make px4_sitl gz_x500_depth    # First build takes ~10 min
+```
+
+### Step 5: Build Micro-XRCE-DDS Agent
+```bash
+git clone https://github.com/eProsima/Micro-XRCE-DDS-Agent.git
+cd Micro-XRCE-DDS-Agent && mkdir build && cd build
+cmake .. && make && sudo make install && sudo ldconfig
+```
+
+### Step 6: Build px4_msgs ROS 2 Workspace
+```bash
+mkdir -p ~/px4_ros_ws/src && cd ~/px4_ros_ws/src
+git clone https://github.com/PX4/px4_msgs.git -b release/1.14
+cd ~/px4_ros_ws
+source /opt/ros/humble/setup.bash
+colcon build
+```
+
+### Step 7: Install Python Dependencies
+```bash
+pip3 install -r requirements.txt
+```
+
+### Step 8: Clone This Repository
+```bash
+cd ~/Desktop
+git clone https://github.com/ami4go/Indoor-Drone-Navigation.git Drone_IP
+chmod +x ~/Desktop/Drone_IP/launch_sim.sh
+```
 
 ### Launch Everything
 ```bash

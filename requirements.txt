@@ -1,0 +1,92 @@
+# ==============================================================================
+# Autonomous Indoor Drone Navigation — Requirements
+# ==============================================================================
+#
+# This file lists ALL dependencies needed to run the simulation.
+# Since this is a ROS 2 + PX4 project, most dependencies are system-level
+# packages installed via apt, not pip. Follow the sections below in order.
+#
+# ==============================================================================
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SECTION 1: Operating System
+# ──────────────────────────────────────────────────────────────────────────────
+# Ubuntu 22.04 LTS (Jammy Jellyfish)
+# Download: https://releases.ubuntu.com/22.04/
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SECTION 2: ROS 2 Humble Hawksbill (System packages via apt)
+# ──────────────────────────────────────────────────────────────────────────────
+# Installation guide: https://docs.ros.org/en/humble/Installation.html
+#
+# sudo apt update && sudo apt install -y \
+#   ros-humble-desktop \
+#   ros-humble-ros-gzgarden-bridge \
+#   ros-humble-octomap \
+#   ros-humble-octomap-server \
+#   ros-humble-octomap-msgs \
+#   ros-humble-octomap-ros \
+#   ros-humble-octomap-rviz-plugins \
+#   ros-humble-pcl-ros
+#
+# Versions installed:
+#   ros-humble-desktop            — ROS 2 Humble (full desktop)
+#   ros-humble-ros-gzgarden-bridge — v0.244.11 (Gazebo ↔ ROS 2 bridge)
+#   ros-humble-octomap            — v1.9.8 (3D occupancy mapping)
+#   ros-humble-octomap-server     — v2.3.1 (map builder node)
+#   ros-humble-octomap-msgs       — v2.0.1 (OctoMap message types)
+#   ros-humble-octomap-ros        — v0.4.4 (OctoMap ROS integration)
+#   ros-humble-octomap-rviz-plugins — v2.1.1 (3D map visualization)
+#   ros-humble-pcl-ros            — v2.4.5 (Point Cloud Library)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SECTION 3: Gazebo Garden v7.9.0 (Simulator)
+# ──────────────────────────────────────────────────────────────────────────────
+# Installed alongside PX4. Verify with: gz sim --version
+# Docs: https://gazebosim.org/docs/garden
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SECTION 4: PX4 Autopilot v1.14 (Flight Controller — SITL mode)
+# ──────────────────────────────────────────────────────────────────────────────
+# Clone and build from source:
+#   git clone https://github.com/PX4/PX4-Autopilot.git --recursive -b v1.14.0
+#   cd PX4-Autopilot && bash ./Tools/setup/ubuntu.sh
+#   make px4_sitl gz_x500_depth
+#
+# Docs: https://docs.px4.io/main/en/simulation/gazebo_gz.html
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SECTION 5: Micro-XRCE-DDS Agent (PX4 ↔ ROS 2 Bridge)
+# ──────────────────────────────────────────────────────────────────────────────
+# Build from source:
+#   git clone https://github.com/eProsima/Micro-XRCE-DDS-Agent.git
+#   cd Micro-XRCE-DDS-Agent && mkdir build && cd build
+#   cmake .. && make && sudo make install
+#   sudo ldconfig
+#
+# Docs: https://docs.px4.io/main/en/middleware/uxrce_dds.html
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SECTION 6: px4_msgs (ROS 2 workspace package)
+# ──────────────────────────────────────────────────────────────────────────────
+# Required for Python nodes to communicate with PX4:
+#   mkdir -p ~/px4_ros_ws/src && cd ~/px4_ros_ws/src
+#   git clone https://github.com/PX4/px4_msgs.git -b release/1.14
+#   cd ~/px4_ros_ws
+#   source /opt/ros/humble/setup.bash
+#   colcon build
+#
+# After building, source before running any node:
+#   source ~/px4_ros_ws/install/setup.bash
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SECTION 7: Python pip packages
+# ──────────────────────────────────────────────────────────────────────────────
+# These are the only pip-installable packages needed.
+# Install with: pip3 install -r requirements.txt
+#
+# numpy is used by pointcloud_filter.py for Voxel Grid and SOR filtering.
+# All other Python dependencies (rclpy, sensor_msgs, etc.) come from the
+# ROS 2 Humble installation in Section 2.
+
+numpy>=1.21.0

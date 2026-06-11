@@ -20,76 +20,94 @@ Visualization Manager:
         Y: 0
         Z: 0
       Plane: XY
-      Plane Cell Count: 10
+      Plane Cell Count: 15
       Reference Frame: <Fixed Frame>
-      Color: 100; 100; 100
+      Color: 80; 80; 80
 
+    # ── OctoMap 3D Obstacles (GREY) ─────────────────────────────────────────
+    - Class: rviz_default_plugins/MarkerArray
+      Name: "OctoMap — Obstacles (Grey)"
+      Enabled: true
+      Topic:
+        Value: /occupied_cells_vis_array
+        Depth: 5
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+      Queue Size: 5
+
+    # ── A* Planned Path (CYAN LINE) ─────────────────────────────────────────
+    - Class: rviz_default_plugins/Path
+      Name: "A* Planned Path"
+      Enabled: true
+      Topic:
+        Value: /plan
+        Depth: 5
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+      Color: 0; 220; 255
+      Line Width: 0.06
+      Head Diameter: 0.2
+      Head Length: 0.1
+      Shaft Diameter: 0.06
+      Buffer Length: 1
+
+    # ── Raw Point Cloud (OFF by default — turn on for debugging only) ───────
     - Class: rviz_default_plugins/PointCloud2
-      Name: Raw Point Cloud
+      Name: Raw Point Cloud (debug)
       Enabled: false
       Topic:
         Value: /depth_camera/points
         Depth: 1
         Reliability Policy: Best Effort
         Durability Policy: Volatile
-      Size (Pixels): 2
+      Size (Pixels): 1
       Style: Points
       Color Transformer: FlatColor
-      Color: 100; 100; 255
+      Color: 160; 160; 160
       Decay Time: 0
-      Max Color: 255; 255; 255
-      Min Color: 0; 0; 0
       Use Fixed Frame: true
 
+    # ── Filtered Point Cloud (OFF — we use OctoMap for visualization) ────────
     - Class: rviz_default_plugins/PointCloud2
-      Name: Filtered Point Cloud
-      Enabled: true
+      Name: Filtered Point Cloud (debug)
+      Enabled: false
       Topic:
         Value: /depth_camera/points_filtered
         Depth: 1
         Reliability Policy: Best Effort
         Durability Policy: Volatile
-      Size (Pixels): 4
+      Size (Pixels): 2
       Style: Points
       Color Transformer: FlatColor
-      Color: 0; 255; 100
+      Color: 200; 200; 200
       Decay Time: 0
-      Max Color: 255; 255; 255
-      Min Color: 0; 0; 0
       Use Fixed Frame: true
 
-    - Class: rviz_default_plugins/MarkerArray
-      Name: OctoMap Occupied Cells
-      Enabled: true
-      Topic:
-        Value: /occupied_cells_vis_array
-        Depth: 1
-        Reliability Policy: Reliable
-        Durability Policy: Volatile
-
   Global Options:
-    Background Color: 30; 30; 30
+    Background Color: 20; 20; 20
     Fixed Frame: map
     Frame Rate: 30
   Name: root
   Tools:
     - Class: rviz_default_plugins/MoveCamera
     - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/SetGoal
+      Topic: /goal_pose
   Value: true
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 8
+      Distance: 14
       Focal Point:
         X: 0
         Y: 0
-        Z: 0
+        Z: 1
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.5
+      Pitch: 0.6
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.5
+      Yaw: 0.8

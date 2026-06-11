@@ -48,7 +48,7 @@ SDF_DEST="$PX4_DIR/Tools/simulation/gz/worlds/indoor_10x8x3.sdf"
 
 # Scripts
 KEYBOARD_SCRIPT="$HOME/Desktop/Drone_IP/keyboard_control.py"
-WAYPOINT_SCRIPT="$HOME/Desktop/Drone_IP/offboard_waypoint_nav.py"
+WAYPOINT_SCRIPT="$HOME/Desktop/Drone_IP/autonomous_navigator.py"
 
 # --- Determine which controller to use ---------------------------------------
 CONTROLLER_SCRIPT="$KEYBOARD_SCRIPT"
@@ -56,7 +56,7 @@ CONTROLLER_NAME="Keyboard Controller"
 
 if [[ "$1" == "--auto" ]]; then
     CONTROLLER_SCRIPT="$WAYPOINT_SCRIPT"
-    CONTROLLER_NAME="Waypoint Navigation (Auto)"
+    CONTROLLER_NAME="Autonomous Navigator (A* Path Planner)"
 fi
 
 # --- Detect terminal emulator ------------------------------------------------
@@ -148,7 +148,7 @@ sleep 3  # Let controller initialize before starting bridge
 # Without this, your ROS 2 nodes can't see the depth camera data.
 echo "🌉 [Terminal 4] Starting Gazebo → ROS 2 Bridge..."
 open_terminal "T4 — GZ-ROS2 Bridge" \
-    "source /opt/ros/humble/setup.bash && echo '🌉 Bridging Gazebo depth topics to ROS 2...' && ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /depth_camera@sensor_msgs/msg/Image[gz.msgs.Image /depth_camera/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked /camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
+    "source /opt/ros/humble/setup.bash && echo '🌉 Bridging Gazebo depth topics to ROS 2...' && ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /depth_camera@sensor_msgs/msg/Image[gz.msgs.Image /depth_camera/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked /camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo /world/indoor_10x8x3/dynamic_pose/info@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V"
 
 sleep 3  # Let bridge initialize before starting filter
 
@@ -182,10 +182,11 @@ open_terminal "T7 — TF Broadcaster" \
 sleep 3  # TF must be running before OctoMap starts
 
 # --- Terminal 8: OctoMap Server -----------------------------------------------
-# Builds a persistent 3D occupancy map from the filtered point cloud.
+# Builds a persistent 3D occupancy map from the RAW point cloud.
+# OctoMap handles its own spatial resolution — no pre-filtering needed.
 echo "🗺️  [Terminal 8] Starting OctoMap Server..."
 open_terminal "T8 — OctoMap Server" \
-    "source /opt/ros/humble/setup.bash && echo '🗺️  Starting OctoMap Server...' && ros2 run octomap_server octomap_server_node --ros-args -p use_sim_time:=true -r cloud_in:=/depth_camera/points_filtered -p resolution:=0.1 -p frame_id:=map -p sensor_model.max_range:=8.0 -p sensor_model.min_range:=0.3 -p sensor_model.hit:=0.7 -p sensor_model.miss:=0.4 -p occupancy_min_z:=0.2 -p occupancy_max_z:=2.5"
+    "source /opt/ros/humble/setup.bash && echo '🗺️  Starting OctoMap Server...' && ros2 run octomap_server octomap_server_node --ros-args -p use_sim_time:=true -r cloud_in:=/depth_camera/points -p resolution:=0.05 -p frame_id:=map -p sensor_model.max_range:=5.0 -p sensor_model.min_range:=0.3 -p sensor_model.hit:=0.7 -p sensor_model.miss:=0.4 -p occupancy_min_z:=0.15 -p occupancy_max_z:=3.0 -p height_map:=false -p color.r:=0.6 -p color.g:=0.6 -p color.b:=0.6 -p color.a:=1.0"
 
 echo ""
 echo "=============================================="
@@ -194,15 +195,15 @@ echo "=============================================="
 echo ""
 echo "  T1: DDS Bridge        — should show 'Agent running'"
 echo "  T2: PX4 + Gazebo      — wait for 'Ready for takeoff!'"
-echo "  T3: $CONTROLLER_NAME"
-echo "  T4: GZ-ROS2 Bridge    — bridges depth camera to ROS 2"
+echo "  T3: Keyboard Control  — manual override if needed"
+echo "  T4: GZ-ROS2 Bridge    — bridges depth camera + pose to ROS 2"
 echo "  T5: PointCloud Filter — cleans raw point cloud data"
 echo "  T6: RViz2             — 3D point cloud + OctoMap visualization"
-echo "  T7: TF Broadcaster    — publishes drone position as TF"
+echo "  T7: TF Broadcaster    — Gazebo ground-truth TF"
 echo "  T8: OctoMap Server    — builds 3D occupancy map"
 echo ""
 if [[ "$1" != "--auto" ]]; then
-    echo "  Controls:"
+    echo "  Controls (Focus on Terminal 3):"
     echo "    T = Takeoff    L = Land"
     echo "    W = Forward    S = Backward"
     echo "    A = Left       D = Right"

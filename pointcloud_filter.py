@@ -66,11 +66,11 @@ class PointCloudFilter(Node):
         # You can tune these to trade off between speed and detail.
 
         # Voxel size in meters — smaller = more detail but more points
-        self.VOXEL_SIZE = 0.08  # 8cm cubes (good for indoor room)
+        self.VOXEL_SIZE = 0.04  # 4cm cubes (finer detail for accurate mapping)
 
         # Statistical outlier removal parameters
         self.SOR_K_NEIGHBORS = 10   # Check this many nearest neighbors
-        self.SOR_STD_RATIO = 1.5    # Remove points > 1.5 std dev away
+        self.SOR_STD_RATIO = 2.0    # Remove points > 2.0 std dev away (less aggressive)
 
         # Maximum range — ignore points further than this (meters)
         self.MAX_RANGE = 8.0  # Our room is 10x8m, so 8m is plenty

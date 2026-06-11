@@ -21,8 +21,8 @@ An autonomous drone simulation pipeline that gives a simulated quadcopter the ab
 | ✅ | OctoMap 3D Mapping | Persistent occupancy grid — drone remembers obstacles after turning away |
 | ✅ | TF Broadcaster | Publishes drone position as TF transforms for map alignment |
 | ✅ | OctoMap Visualization | 3D voxel cubes in RViz2 showing occupied/free space |
-| 🔲 | A* Path Planning | Compute obstacle-free routes from start to destination |
-| 🔲 | Autonomous Navigation | Connect planner to PX4 for fully autonomous flight |
+| ✅ | A* Path Planning | Compute obstacle-free routes from start to destination |
+| ✅ | Autonomous Navigation | Connect planner to PX4 for fully autonomous flight |
 
 ---
 
@@ -140,6 +140,22 @@ For the map to be accurate, OctoMap needs to know **where the camera was** when 
 The combined view shows all three systems working together: Gazebo simulation (right), keyboard controller with real-time position tracking (top-right), RViz2 with OctoMap and point cloud overlay (left).
 
 ![Full System — Gazebo + RViz2 + Keyboard Controller running simultaneously](Demo_Pic/Ref.png)
+
+---
+
+## 🧠 Autonomous Navigation (A*)
+
+Once the room geometry is known, the drone uses an **A* Path Planning** algorithm to navigate from point A to point B without hitting any walls or pillars.
+
+### Why not RTAB-Map?
+While advanced SLAM systems like RTAB-Map (Real-Time Appearance-Based Mapping) are excellent for large, unknown environments with loop closure, they require heavy CPU/GPU resources (especially when running alongside Gazebo and PX4 SITL on a laptop). Since our simulation takes place in a known 10x8m room, a robust static grid map combined with A* path planning is vastly more efficient, highly reliable, and guarantees collision-free navigation without dropping simulation frame rates. OctoMap is retained purely for the 3D visualization.
+
+- **State Machine:** The drone takes off, performs a 360-degree scan to visualize the environment in OctoMap, and then waits in a `READY` state.
+- **RViz Goal Selection:** The user clicks a `2D Goal Pose` in RViz.
+- **A* Planner:** Calculates a safe path, applying a 0.7m safety inflation margin around obstacles.
+- **Offboard Control:** A Python node converts the waypoints into relative PX4 local position setpoints and flies the drone smoothly to the destination.
+
+![Autonomous A* Navigation in RViz — Cyan line shows the calculated safe path around grey OctoMap obstacles](Demo_Pic/Autonomous_AStar_Nav.png)
 
 ---
 

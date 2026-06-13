@@ -53,7 +53,7 @@ class TFBroadcasterNode(Node):
         # ── Subscribe to bridged Gazebo dynamic_pose (TFMessage) ──
         self.gz_sub = self.create_subscription(
             TFMessage,
-            '/world/indoor_10x8x3/dynamic_pose/info',
+            '/world/house_3room/dynamic_pose/info',
             self.gz_pose_callback,
             QoSProfile(
                 reliability=ReliabilityPolicy.BEST_EFFORT,

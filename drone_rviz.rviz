@@ -97,11 +97,11 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 14
+      Distance: 25
       Focal Point:
         X: 0
         Y: 0
-        Z: 1
+        Z: 1.5
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05
       Invert Z Axis: false

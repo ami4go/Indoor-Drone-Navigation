@@ -13,8 +13,10 @@
 #    ~/Desktop/Drone_IP/launch_sim.sh             (run it!)
 #
 #  OPTIONAL ARGUMENT:
-#    --auto     Also launches the automated waypoint navigation script
-#               instead of the keyboard controller.
+#    --auto     Launches the sensor-based autonomous navigator instead
+#               of the keyboard controller. The drone will explore the
+#               room, build a map from depth camera data (OctoMap), and
+#               then accept 2D Goal Pose targets from RViz for A* planning.
 #
 #  WHAT GETS LAUNCHED:
 #    Terminal 1: Micro-XRCE-DDS Agent   (bridge between PX4 ↔ ROS 2)
@@ -42,9 +44,9 @@ echo ""
 DDS_AGENT_DIR="$HOME/Micro-XRCE-DDS-Agent/build"
 PX4_DIR="$HOME/PX4-Autopilot"
 ROS2_WS="$HOME/px4_ros_ws"
-WORLD_NAME="indoor_10x8x3"
-SDF_SOURCE="$HOME/Desktop/Drone_IP/indoor_10x8x3.sdf"
-SDF_DEST="$PX4_DIR/Tools/simulation/gz/worlds/indoor_10x8x3.sdf"
+WORLD_NAME="house_3room"
+SDF_SOURCE="$HOME/Desktop/Drone_IP/house_3room.sdf"
+SDF_DEST="$PX4_DIR/Tools/simulation/gz/worlds/house_3room.sdf"
 
 # Scripts
 KEYBOARD_SCRIPT="$HOME/Desktop/Drone_IP/keyboard_control.py"
@@ -148,7 +150,7 @@ sleep 3  # Let controller initialize before starting bridge
 # Without this, your ROS 2 nodes can't see the depth camera data.
 echo "🌉 [Terminal 4] Starting Gazebo → ROS 2 Bridge..."
 open_terminal "T4 — GZ-ROS2 Bridge" \
-    "source /opt/ros/humble/setup.bash && echo '🌉 Bridging Gazebo depth topics to ROS 2...' && ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /depth_camera@sensor_msgs/msg/Image[gz.msgs.Image /depth_camera/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked /camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo /world/indoor_10x8x3/dynamic_pose/info@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V"
+    "source /opt/ros/humble/setup.bash && echo '🌉 Bridging Gazebo depth topics to ROS 2...' && ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /depth_camera@sensor_msgs/msg/Image[gz.msgs.Image /depth_camera/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked /camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo /world/house_3room/dynamic_pose/info@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V"
 
 sleep 3  # Let bridge initialize before starting filter
 
@@ -186,7 +188,7 @@ sleep 3  # TF must be running before OctoMap starts
 # OctoMap handles its own spatial resolution — no pre-filtering needed.
 echo "🗺️  [Terminal 8] Starting OctoMap Server..."
 open_terminal "T8 — OctoMap Server" \
-    "source /opt/ros/humble/setup.bash && echo '🗺️  Starting OctoMap Server...' && ros2 run octomap_server octomap_server_node --ros-args -p use_sim_time:=true -r cloud_in:=/depth_camera/points -p resolution:=0.05 -p frame_id:=map -p sensor_model.max_range:=5.0 -p sensor_model.min_range:=0.3 -p sensor_model.hit:=0.7 -p sensor_model.miss:=0.4 -p occupancy_min_z:=0.15 -p occupancy_max_z:=3.0 -p height_map:=false -p color.r:=0.6 -p color.g:=0.6 -p color.b:=0.6 -p color.a:=1.0"
+    "source /opt/ros/humble/setup.bash && echo '🗺️  Starting OctoMap Server...' && ros2 run octomap_server octomap_server_node --ros-args -p use_sim_time:=true -r cloud_in:=/depth_camera/points -p resolution:=0.10 -p frame_id:=map -p sensor_model.max_range:=5.0 -p sensor_model.min_range:=0.3 -p sensor_model.hit:=0.7 -p sensor_model.miss:=0.4 -p occupancy_min_z:=0.15 -p occupancy_max_z:=3.0 -p height_map:=false -p color.r:=0.6 -p color.g:=0.6 -p color.b:=0.6 -p color.a:=1.0"
 
 echo ""
 echo "=============================================="

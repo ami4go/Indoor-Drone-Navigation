@@ -340,8 +340,7 @@ chmod +x ~/Desktop/Drone_IP/launch_sim.sh
 
 ## 👤 Author
 
-**Amit Kumar** — IIIT Delhi
-GitHub: [@ami4go](https://github.com/ami4go)
+**Amit**
 
 ---
 

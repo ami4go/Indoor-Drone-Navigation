@@ -402,4 +402,4 @@ All 4 algorithms run on the **same OctoMap-derived sensor map** of the 3-room ho
 
 ## 📄 License
 
-This project is part of an academic B.Tech Project (BTP) at IIIT Delhi.
+This project is part of an academic Independent Project (IP) at IIIT Delhi.

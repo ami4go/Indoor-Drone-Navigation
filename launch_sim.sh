@@ -12,11 +12,11 @@
 #    chmod +x ~/Desktop/Drone_IP/launch_sim.sh   (only needed once)
 #    ~/Desktop/Drone_IP/launch_sim.sh             (run it!)
 #
-#  OPTIONAL ARGUMENT:
+#  OPTIONAL ARGUMENTS:
 #    --auto     Launches the sensor-based autonomous navigator instead
-#               of the keyboard controller. The drone will explore the
-#               room, build a map from depth camera data (OctoMap), and
-#               then accept 2D Goal Pose targets from RViz for A* planning.
+#               of the keyboard controller.
+#    --algo X   Choose the path planning algorithm (default: astar)
+#               Options: astar, prm, rrt, theta, dstar
 #
 #  WHAT GETS LAUNCHED:
 #    Terminal 1: Micro-XRCE-DDS Agent   (bridge between PX4 ↔ ROS 2)
@@ -45,20 +45,68 @@ DDS_AGENT_DIR="$HOME/Micro-XRCE-DDS-Agent/build"
 PX4_DIR="$HOME/PX4-Autopilot"
 ROS2_WS="$HOME/px4_ros_ws"
 WORLD_NAME="house_3room"
-SDF_SOURCE="$HOME/Desktop/Drone_IP/house_3room.sdf"
+SDF_SOURCE="$HOME/Desktop/Drone_IP/worlds/house_3room.sdf"
 SDF_DEST="$PX4_DIR/Tools/simulation/gz/worlds/house_3room.sdf"
 
 # Scripts
-KEYBOARD_SCRIPT="$HOME/Desktop/Drone_IP/keyboard_control.py"
-WAYPOINT_SCRIPT="$HOME/Desktop/Drone_IP/autonomous_navigator.py"
+KEYBOARD_SCRIPT="$HOME/Desktop/Drone_IP/core/keyboard_control.py"
+
+# --- Parse arguments ---------------------------------------------------------
+AUTO_MODE=false
+ALGO="astar"
+
+for arg in "$@"; do
+    case "$arg" in
+        --auto) AUTO_MODE=true ;;
+        --algo)
+            # Next arg will be the algorithm name
+            ;;
+        astar|prm|rrt|theta|dstar)
+            ALGO="$arg" ;;
+    esac
+done
+
+# Handle --algo <name> (two-word argument)
+for i in $(seq 1 $#); do
+    arg="${!i}"
+    if [[ "$arg" == "--algo" ]]; then
+        next=$((i + 1))
+        ALGO="${!next}"
+    fi
+done
 
 # --- Determine which controller to use ---------------------------------------
 CONTROLLER_SCRIPT="$KEYBOARD_SCRIPT"
 CONTROLLER_NAME="Keyboard Controller"
 
-if [[ "$1" == "--auto" ]]; then
-    CONTROLLER_SCRIPT="$WAYPOINT_SCRIPT"
-    CONTROLLER_NAME="Autonomous Navigator (A* Path Planner)"
+if [[ "$AUTO_MODE" == "true" ]]; then
+    case "$ALGO" in
+        astar)
+            CONTROLLER_SCRIPT="$HOME/Desktop/Drone_IP/planners/navigator_astar.py"
+            CONTROLLER_NAME="Autonomous Navigator (A* Path Planner)"
+            ;;
+        prm)
+            CONTROLLER_SCRIPT="$HOME/Desktop/Drone_IP/planners/navigator_prm.py"
+            CONTROLLER_NAME="Autonomous Navigator (PRM Planner)"
+            ;;
+        rrt)
+            CONTROLLER_SCRIPT="$HOME/Desktop/Drone_IP/planners/navigator_rrt.py"
+            CONTROLLER_NAME="Autonomous Navigator (RRT Planner)"
+            ;;
+        theta)
+            CONTROLLER_SCRIPT="$HOME/Desktop/Drone_IP/planners/navigator_theta_star.py"
+            CONTROLLER_NAME="Autonomous Navigator (Theta* Planner)"
+            ;;
+        dstar)
+            CONTROLLER_SCRIPT="$HOME/Desktop/Drone_IP/planners/navigator_dstar_lite.py"
+            CONTROLLER_NAME="Autonomous Navigator (D* Lite Planner)"
+            ;;
+        *)
+            echo "Unknown algorithm: $ALGO"
+            echo "Options: astar, prm, rrt, theta, dstar"
+            exit 1
+            ;;
+    esac
 fi
 
 # --- Detect terminal emulator ------------------------------------------------
@@ -157,7 +205,7 @@ sleep 3  # Let bridge initialize before starting filter
 # --- Terminal 5: Point Cloud Filter -------------------------------------------
 # Subscribes to raw point cloud, applies voxel grid + outlier removal,
 # and publishes cleaned data for path planning.
-FILTER_SCRIPT="$HOME/Desktop/Drone_IP/pointcloud_filter.py"
+FILTER_SCRIPT="$HOME/Desktop/Drone_IP/core/pointcloud_filter.py"
 echo "🔬 [Terminal 5] Starting Point Cloud Filter..."
 open_terminal "T5 — PointCloud Filter" \
     "cd $ROS2_WS && source install/setup.bash && echo '🔬 Starting Point Cloud Filter...' && python3 $FILTER_SCRIPT --ros-args -p use_sim_time:=true"
@@ -166,7 +214,7 @@ sleep 3  # Let filter start before launching RViz2
 
 # --- Terminal 6: RViz2 Visualization ------------------------------------------
 # 3D visualization of the filtered point cloud — you can SEE what the drone sees.
-RVIZ_CONFIG="$HOME/Desktop/Drone_IP/drone_rviz.rviz"
+RVIZ_CONFIG="$HOME/Desktop/Drone_IP/config/drone_rviz.rviz"
 echo "👁️  [Terminal 6] Starting RViz2 Visualization..."
 open_terminal "T6 — RViz2" \
     "source /opt/ros/humble/setup.bash && echo '👁️  Launching RViz2...' && rviz2 -d $RVIZ_CONFIG --ros-args -p use_sim_time:=true"
@@ -176,7 +224,7 @@ sleep 2
 # --- Terminal 7: TF Broadcaster -----------------------------------------------
 # Publishes drone position as TF transforms so OctoMap knows where
 # the camera is in the world.
-TF_SCRIPT="$HOME/Desktop/Drone_IP/tf_broadcaster.py"
+TF_SCRIPT="$HOME/Desktop/Drone_IP/core/tf_broadcaster.py"
 echo "📍 [Terminal 7] Starting TF Broadcaster..."
 open_terminal "T7 — TF Broadcaster" \
     "cd $ROS2_WS && source install/setup.bash && echo '📍 Starting TF Broadcaster...' && python3 $TF_SCRIPT --ros-args -p use_sim_time:=true"

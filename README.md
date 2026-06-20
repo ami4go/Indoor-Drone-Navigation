@@ -1,8 +1,8 @@
 # 🚁 Autonomous Indoor Drone Navigation
 
-> **Sensor-based 3D mapping and A\* path planning for GPS-denied indoor flight using ROS 2, PX4, and Gazebo.**
+> **Sensor-based 3D mapping and multi-algorithm path planning for GPS-denied indoor flight using ROS 2, PX4, and Gazebo.**
 
-A fully autonomous drone simulation pipeline where a quadcopter **explores** an unknown indoor environment using its depth camera, **builds a persistent 3D map** with OctoMap, and **navigates** collision-free paths using A\* planning on real sensor data — all without GPS or prior knowledge of the room layout.
+A fully autonomous drone simulation pipeline where a quadcopter **explores** an unknown indoor environment using its depth camera, **builds a persistent 3D map** with OctoMap, and **navigates** collision-free paths using **4 different path planning algorithms** (A\*, PRM, RRT, Theta\*) on real sensor data — all without GPS or prior knowledge of the room layout.
 
 ![3-Room House — Gazebo simulation (left) and OctoMap 3D reconstruction with A* path (right)](Demo_Pic/House_3Room_Navigation.png)
 
@@ -21,7 +21,7 @@ A fully autonomous drone simulation pipeline where a quadcopter **explores** an 
 | ✅ | Point Cloud Filtering | Voxel Grid + Statistical Outlier Removal (307K → ~170 pts/frame) |
 | ✅ | OctoMap 3D Mapping | Persistent voxel occupancy grid from depth camera |
 | ✅ | TF Broadcaster | Drone position as TF transforms for map alignment |
-| ✅ | A* Path Planning | Sensor-derived obstacle-free route computation |
+| ✅ | Path Planning (A\*, PRM, RRT, Theta\*) | 4 algorithms compared on the same sensor-derived map |
 | ✅ | Autonomous Multi-Room Navigation | Drone explores 3-room house, plans paths through doorways |
 
 ---
@@ -63,9 +63,9 @@ A fully autonomous drone simulation pipeline where a quadcopter **explores** an 
                     ┌─────────────┼────────────────┐
                     ▼                              ▼
           ┌──────────────────┐          ┌──────────────────┐
-          │    RViz2          │          │  A* Navigator    │
+          │    RViz2          │          │  Path Planner    │
           │  3D Visualization │          │  /projected_map  │
-          │  (grey voxels)    │          │  → path planning │
+          │  (grey voxels)    │          │  A*/PRM/RRT/θ*   │
           └──────────────────┘          └──────────────────┘
 ```
 
@@ -83,7 +83,7 @@ A fully autonomous drone simulation pipeline where a quadcopter **explores** an 
 | **OctoMap** | v1.9.8 | 3D occupancy mapping |
 | **PCL-ROS** | v2.4.5 | Point cloud processing |
 | **Python** | 3.10 + NumPy | ROS 2 node scripting |
-| **A\* Algorithm** | Custom | Sensor-based path planning |
+| **Path Planners** | A\*, PRM, RRT, Theta\* | Multi-algorithm comparison |
 
 ---
 
@@ -180,8 +180,8 @@ The drone does **not** know the room layout in advance. It discovers obstacles u
 ### Exploration Phase
 After takeoff, the drone autonomously visits **13 scan positions** spread across all 3 rooms. At each position, it performs a full **360° rotation** so the depth camera captures obstacles from every angle. The route goes: **Bedroom → Living Room → back through Bedroom → Study Room**.
 
-### Sensor-Derived A\* Planning
-When the user sets a target via RViz's `2D Goal Pose`, the A\* algorithm runs on OctoMap's `/projected_map` — the real 2D projection of sensor-discovered obstacles. Obstacles are inflated by **0.25m** for safety clearance.
+### Sensor-Derived Path Planning
+When the user sets a target via RViz's `2D Goal Pose`, the selected path planning algorithm (A\*, PRM, RRT, or Theta\*) runs on OctoMap's `/projected_map` — the real 2D projection of sensor-discovered obstacles. Obstacles are inflated by **0.25m** for safety clearance.
 
 ### Coordinate Bridge
 The planner outputs waypoints in Gazebo ENU coordinates. A relative-delta conversion translates these to PX4 NED setpoints, making the system independent of coordinate origin mismatches.
@@ -190,9 +190,9 @@ The planner outputs waypoints in Gazebo ENU coordinates. A relative-delta conver
 
 ## 💡 Design Decisions
 
-### Why OctoMap + A\* instead of RTAB-Map?
+### Why OctoMap instead of RTAB-Map?
 
-While **RTAB-Map** (Real-Time Appearance-Based Mapping) offers loop closure and dense RGB-D reconstruction, it requires heavy CPU/GPU resources — especially when running alongside Gazebo, PX4 SITL, and 8 concurrent processes on a laptop. OctoMap provides sufficient 3D mapping fidelity for obstacle avoidance, and A\* guarantees collision-free paths without the overhead of a full visual SLAM pipeline.
+While **RTAB-Map** (Real-Time Appearance-Based Mapping) offers loop closure and dense RGB-D reconstruction, it requires heavy CPU/GPU resources — especially when running alongside Gazebo, PX4 SITL, and 8 concurrent processes on a laptop. OctoMap provides sufficient 3D mapping fidelity for obstacle avoidance without the overhead of a full visual SLAM pipeline.
 
 ### Why not Ultrasonic Sensors?
 
@@ -218,8 +218,6 @@ The OakD-Lite depth camera captures **307,200 raw 3D points per frame** at 30fps
 
 **Result:** 307,200 raw → ~170 clean points per frame.
 
-![RViz2 Point Cloud — Filtered depth camera output](Demo_Pic/Screenshot%20from%202026-06-08%2002-14-56.png)
-
 ### 3D Occupancy Mapping (OctoMap)
 
 OctoMap builds a **persistent 3D memory** from the filtered point cloud:
@@ -229,7 +227,7 @@ OctoMap builds a **persistent 3D memory** from the filtered point cloud:
 
 The TF Broadcaster provides the camera's position in the world (`map → base_link → camera_frame`) so OctoMap knows where each depth frame was captured.
 
-![OctoMap 3D visualization — Grey voxels show persistent obstacle memory](Demo_Pic/Screenshot%20from%202026-06-08%2002-15-31.png)
+![Early-stage OctoMap visualization — Filtered point cloud and voxel grid (single room environment)](Demo_Pic/Screenshot%20from%202026-06-08%2002-15-31.png)
 
 ---
 
@@ -238,17 +236,22 @@ The TF Broadcaster provides the camera's position in the world (`map → base_li
 | File | Description |
 |:---|:---|
 | `launch_sim.sh` | One-command launcher — opens 8 coordinated terminals |
-| `house_3room.sdf` | **Active world** — 3-room house (18×12m) with furniture |
-| `indoor_10x8x3.sdf` | Legacy world — single room (10×8m) with 3 obstacles |
-| `autonomous_navigator.py` | **A\* path planner** — sensor-based exploration + OctoMap planning |
-| `keyboard_control.py` | Manual WASD drone controller with real-time position display |
-| `offboard_waypoint_nav.py` | Early waypoint navigator (proved blind nav fails) |
-| `pointcloud_filter.py` | Voxel Grid + SOR filter node (307K → 170 points) |
-| `tf_broadcaster.py` | Publishes drone position as TF transforms for OctoMap |
-| `room_scanner.py` | Automated room scanning flight patterns |
-| `octomap_params.yaml` | OctoMap server configuration |
-| `drone_rviz.rviz` | RViz2 config — OctoMap (grey) + A\* path (cyan) |
-| `requirements.txt` | Full dependency list with versions and install commands |
+| **planners/** | |
+| `planners/navigator_astar.py` | **A\*** — Grid-based search with f=g+h heuristic |
+| `planners/navigator_prm.py` | **PRM** — Probabilistic Roadmap with Dijkstra search |
+| `planners/navigator_rrt.py` | **RRT** — Rapidly-exploring Random Tree |
+| `planners/navigator_theta_star.py` | **Theta\*** — Any-angle A\* with line-of-sight shortcuts |
+| **core/** | |
+| `core/keyboard_control.py` | Manual WASD drone controller with real-time position display |
+| `core/pointcloud_filter.py` | Voxel Grid + SOR filter node (307K → 170 points) |
+| `core/tf_broadcaster.py` | Publishes drone position as TF transforms for OctoMap |
+| `core/room_scanner.py` | Automated room scanning flight patterns |
+| **worlds/** | |
+| `worlds/house_3room.sdf` | **Active world** — 3-room house (18×12m) with furniture |
+| `worlds/indoor_10x8x3.sdf` | Legacy world — single room (10×8m) with 3 obstacles |
+| **config/** | |
+| `config/drone_rviz.rviz` | RViz2 config — OctoMap (grey) + path (cyan) |
+| `config/octomap_params.yaml` | OctoMap server configuration |
 
 ---
 
@@ -298,8 +301,14 @@ chmod +x ~/Desktop/Drone_IP/launch_sim.sh
 # Manual flight (keyboard control):
 ~/Desktop/Drone_IP/launch_sim.sh
 
-# Autonomous mode (explore + A* navigation):
+# Autonomous mode (default A*):
 ~/Desktop/Drone_IP/launch_sim.sh --auto
+
+# Choose a specific algorithm:
+~/Desktop/Drone_IP/launch_sim.sh --auto --algo astar   # A*
+~/Desktop/Drone_IP/launch_sim.sh --auto --algo prm     # Probabilistic Roadmap
+~/Desktop/Drone_IP/launch_sim.sh --auto --algo rrt     # Rapidly-exploring Random Tree
+~/Desktop/Drone_IP/launch_sim.sh --auto --algo theta   # Theta* (any-angle)
 ```
 
 ### What Opens (8 Terminals)
@@ -330,11 +339,58 @@ chmod +x ~/Desktop/Drone_IP/launch_sim.sh
 
 ## 🖼️ Demo Gallery
 
-| View | Screenshot |
-|:---|:---|
-| **Single Room** — A\* path around 3 obstacles | ![Single Room](Demo_Pic/Autonomous_AStar_Nav.png) |
-| **3-Room House** — Cross-room navigation through staggered doorways | ![3-Room House](Demo_Pic/House_3Room_Navigation.png) |
-| **Full System** — Gazebo + RViz + Terminal running together | ![Full System](Demo_Pic/Ref.png) |
+### Full System View
+
+![Full System — Gazebo + RViz + Terminal running together](Demo_Pic/Ref.png)
+
+---
+
+## 📊 Path Planning Algorithm Comparison
+
+All 4 algorithms run on the **same OctoMap-derived sensor map** of the 3-room house. The drone explores the environment identically; only the path planning strategy differs.
+
+### A\* (Grid-Based Search)
+
+![A* path planning — grid-locked 45°/90° path through doorways](Demo_Pic/astar.png)
+
+- **Guarantees the shortest grid-optimal path** using f = g + h heuristic
+- Paths follow the 8-connected grid (45° and 90° turns only)
+- Fast and reliable — the baseline algorithm for all comparisons
+
+### PRM (Probabilistic Roadmap)
+
+![PRM path planning — random sample nodes connected by straight-line edges](Demo_Pic/prm.png)
+
+- **Scatters 600 random points** in free space, then connects neighbors with collision-free lines
+- Produces **straight-line segments** between sample nodes (not grid-locked)
+- Extra samples are seeded near doorways to handle narrow passage connectivity
+
+### RRT (Rapidly-exploring Random Tree)
+
+![RRT path planning — tree grown from start with random exploration](Demo_Pic/rrt.png)
+
+- **Grows a tree from start** by randomly sampling and extending toward free space
+- Fastest to find *a* path, but the result is **jagged with sharp turns**
+- Path simplification removes redundant waypoints, but the drone may still clip corners
+
+### Theta\* (Any-Angle A\*)
+
+![Theta* path planning — smooth any-angle shortcuts through line-of-sight checks](Demo_Pic/theta.png)
+
+- **Extension of A\*** that checks line-of-sight between grandparent and current node
+- Produces the **smoothest, shortest paths** — true geometric shortest route at any angle
+- Uses Bresenham's line algorithm to verify obstacle-free straight lines
+
+### Algorithm Comparison Summary
+
+| Property | A\* | PRM | RRT | Theta\* |
+|:---|:---:|:---:|:---:|:---:|
+| **Optimal Path?** | ✅ Grid-optimal | ❌ Approximate | ❌ Non-optimal | ✅ True shortest |
+| **Path Smoothness** | ⭐⭐ Staircase | ⭐⭐⭐ Straight segments | ⭐ Jagged | ⭐⭐⭐⭐ Smoothest |
+| **Deterministic?** | ✅ Always same | ❌ Random each run | ❌ Random each run | ✅ Always same |
+| **Narrow Passages** | ✅ Handles well | ⚠️ Needs doorway seeding | ⚠️ Needs goal bias | ✅ Handles well |
+| **Planning Speed** | Medium | Slow (roadmap build) | Fast | Medium |
+| **Best For** | Reliable baseline | Multi-query scenarios | Quick exploration | Smooth drone flight |
 
 ---
 

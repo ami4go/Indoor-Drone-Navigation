@@ -61,7 +61,7 @@ for arg in "$@"; do
         --algo)
             # Next arg will be the algorithm name
             ;;
-        astar|prm|rrt|theta|dstar)
+        astar|prm|rrt|theta|dstar|dijkstra|bellman|benchmark)
             ALGO="$arg" ;;
     esac
 done
@@ -101,9 +101,21 @@ if [[ "$AUTO_MODE" == "true" ]]; then
             CONTROLLER_SCRIPT="$HOME/Desktop/Drone_IP/planners/navigator_dstar_lite.py"
             CONTROLLER_NAME="Autonomous Navigator (D* Lite Planner)"
             ;;
+        dijkstra)
+            CONTROLLER_SCRIPT="$HOME/Desktop/Drone_IP/planners/navigator_dijkstra.py"
+            CONTROLLER_NAME="Autonomous Navigator (Dijkstra Planner)"
+            ;;
+        bellman)
+            CONTROLLER_SCRIPT="$HOME/Desktop/Drone_IP/planners/navigator_bellman_ford.py"
+            CONTROLLER_NAME="Autonomous Navigator (Bellman Ford Planner)"
+            ;;
+        benchmark)
+            CONTROLLER_SCRIPT="$HOME/Desktop/Drone_IP/planners/navigator_benchmark.py"
+            CONTROLLER_NAME="Visual Benchmark (All 6 Algorithms)"
+            ;;
         *)
             echo "Unknown algorithm: $ALGO"
-            echo "Options: astar, prm, rrt, theta, dstar"
+            echo "Options: astar, prm, rrt, theta, dijkstra, bellman, benchmark"
             exit 1
             ;;
     esac

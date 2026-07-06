@@ -15,10 +15,12 @@ Quick reference for every file in this project and what it does.
 | File | Algorithm | Status |
 |------|-----------|--------|
 | `navigator_astar.py` | A* (grid search + heuristic) | Done |
+| `navigator_dijkstra.py` | Dijkstra (A* without heuristic) | Done |
+| `navigator_bellman_ford.py` | Bellman Ford (edge relaxation) | Done |
 | `navigator_prm.py` | PRM (Probabilistic Roadmap) | Done |
 | `navigator_rrt.py` | RRT (Rapidly-exploring Random Tree) | Done |
 | `navigator_theta_star.py` | Theta* (any-angle A*) | Done |
-| `navigator_dstar_lite.py` | D* Lite (dynamic replanning) | Pending |
+| `navigator_benchmark.py` | Visual Benchmark (runs all 6, colored paths) | Done |
 
 ## core/ — Shared Drone Infrastructure
 | File | Purpose |
@@ -37,8 +39,15 @@ Quick reference for every file in this project and what it does.
 ## config/ — Configuration
 | File | Purpose |
 |------|---------|
-| `drone_rviz.rviz` | RViz2 layout — OctoMap (grey voxels) + path (cyan line) |
+| `drone_rviz.rviz` | RViz2 layout — OctoMap (grey voxels) + paths (colored) + benchmark markers |
 | `octomap_params.yaml` | OctoMap server resolution, range, thresholds |
+
+## benchmark/ — Automated Performance Comparison
+| File | Purpose |
+|------|---------|
+| `save_map.py` | ROS 2 node that saves OctoMap's OccupancyGrid to `saved_map.npz` |
+| `planner_library.py` | All 6 algorithms as pure Python functions (no ROS deps) |
+| `run_benchmark.py` | Runs all 6 planners on saved map, outputs table + CSV |
 
 ## legacy/ — Old / Experimental Scripts
 | File | Purpose |
@@ -53,6 +62,14 @@ Quick reference for every file in this project and what it does.
 | `Autonomous_AStar_Nav.png` | A* path in single room (RViz) |
 | `House_3Room_Navigation.png` | 3-room house with cross-room A* path |
 | `Ref.png` | Full system view (Gazebo + RViz + Terminal) |
+| `astar.png` | A* algorithm path (Phase 1) |
+| `prm.png` | PRM algorithm path (Phase 1) |
+| `rrt.png` | RRT algorithm path (Phase 1) |
+| `theta.png` | Theta* algorithm path (Phase 1) |
+| `Path 1.png` | Individual path planning demo |
+| `Path 2.png` | Individual path planning demo (different goal) |
+| `Benchmark 1.png` | Visual benchmark — all 6 colored paths |
+| `Benchmark 2.png` | Visual benchmark — different goal |
 
 ## docs/ — Documentation
 | File | Content |

@@ -406,6 +406,15 @@ class AutonomousNavigator(Node):
         self.YAW_STEP = 0.04
         self.SAFETY_MARGIN = 0.25
 
+        # Stability: velocity clamping + yaw smoothing
+        self.MAX_NAV_DELTA = 1.5
+        self.current_yaw = 0.0
+        self.YAW_SMOOTH = 0.15
+
+        # Obstacle avoidance
+        self.AVOIDANCE_CHECK_INTERVAL = 40
+        self.avoidance_tick = 0
+
         # Control timer: 20 Hz
         self.create_timer(0.05, self.control_loop)
 
@@ -470,6 +479,7 @@ class AutonomousNavigator(Node):
         if path:
             self.waypoints = path
             self.wp_idx = 0
+            self.goal_xy = (gx, gy)
             self.state = 'NAVIGATING'
             self._publish_rviz_path(path)
             print(f"   Path found with {len(path)} waypoints. Flying!")
@@ -541,25 +551,81 @@ class AutonomousNavigator(Node):
         if self.wp_idx >= len(self.waypoints):
             print("  DESTINATION REACHED! Set a new goal in RViz.")
             self.waypoints = []
+            self.goal_xy = None
             self.state = 'READY'
             return
+
+        # Obstacle avoidance: periodically check if path is still clear
+        self.avoidance_tick += 1
+        if (self.avoidance_tick % self.AVOIDANCE_CHECK_INTERVAL == 0
+                and self.goal_xy is not None
+                and self.occupancy_grid is not None):
+            if self._path_blocked():
+                print("  \u26a0\ufe0f  Obstacle detected! Replanning...")
+                self._replan()
+                return
 
         wx, wy = self.waypoints[self.wp_idx]
         dx_enu = wx - self.gz_pos[0]
         dy_enu = wy - self.gz_pos[1]
+        dist = math.hypot(dx_enu, dy_enu)
+
+        if dist > self.MAX_NAV_DELTA:
+            scale = self.MAX_NAV_DELTA / dist
+            dx_enu *= scale
+            dy_enu *= scale
+
         tgt_px4_x = self.px4_pos[0] + dy_enu
         tgt_px4_y = self.px4_pos[1] + dx_enu
         tgt_px4_z = -self.ALTITUDE
-        target_yaw = math.atan2(dx_enu, dy_enu)
-        self._send_position(tgt_px4_x, tgt_px4_y, tgt_px4_z, yaw=target_yaw)
 
-        dist = math.hypot(dx_enu, dy_enu)
+        target_yaw = math.atan2(wx - self.gz_pos[0], wy - self.gz_pos[1])
+        yaw_diff = target_yaw - self.current_yaw
+        yaw_diff = (yaw_diff + math.pi) % (2 * math.pi) - math.pi
+        self.current_yaw += self.YAW_SMOOTH * yaw_diff
+        self._send_position(tgt_px4_x, tgt_px4_y, tgt_px4_z, yaw=self.current_yaw)
+
         if dist < self.WP_REACH_DIST:
             self.wp_idx += 1
             if self.wp_idx < len(self.waypoints):
-                print(f"  WP {self.wp_idx}/{len(self.waypoints)} — {dist:.2f}m")
+                print(f"  WP {self.wp_idx}/{len(self.waypoints)} \u2014 {dist:.2f}m")
 
-    # Takeoff
+    def _path_blocked(self):
+        if self.occupancy_grid is None:
+            return False
+        info = self.occupancy_grid.info
+        raw = np.array(self.occupancy_grid.data).reshape((info.height, info.width))
+        margin_cells = int(math.ceil(self.SAFETY_MARGIN / info.resolution))
+        check_end = min(self.wp_idx + 3, len(self.waypoints))
+        for i in range(self.wp_idx, check_end):
+            wx, wy = self.waypoints[i]
+            c = int((wx - info.origin.position.x) / info.resolution)
+            r = int((wy - info.origin.position.y) / info.resolution)
+            for dr in range(-margin_cells, margin_cells + 1):
+                for dc in range(-margin_cells, margin_cells + 1):
+                    cr, cc = r + dr, c + dc
+                    if (0 <= cr < info.height and 0 <= cc < info.width
+                            and raw[cr, cc] > 50):
+                        return True
+        return False
+
+    def _replan(self):
+        if self.goal_xy is None or self.occupancy_grid is None:
+            return
+        self._send_position(self.px4_pos[0], self.px4_pos[1], -self.ALTITUDE)
+        planner = RRTPlanner(self.occupancy_grid, safety_margin=self.SAFETY_MARGIN)
+        path = planner.plan(self.gz_pos[0], self.gz_pos[1],
+                            self.goal_xy[0], self.goal_xy[1])
+        if path:
+            self.waypoints = path
+            self.wp_idx = 0
+            self._publish_rviz_path(path)
+            print(f"  \u2705 Replanned \u2014 {len(path)} waypoints. Resuming!")
+        else:
+            print("  \u274c Replan failed. Try a new goal.")
+            self.waypoints = []
+            self.goal_xy = None
+            self.state = 'READY'
 
     def _takeoff(self):
         print("  Takeoff sequence starting...")

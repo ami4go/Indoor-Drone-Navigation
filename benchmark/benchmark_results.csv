@@ -1,0 +1,31 @@
+Test Case,Algorithm,Time(ms),Path Length(m),Waypoints,Nodes Explored,Smoothness(deg),Success
+Bedroom → Study (cross-room),A*,17.8,7.18,18,1398,45.0,True
+Bedroom → Study (cross-room),Dijkstra,44.2,7.18,9,7777,45.0,True
+Bedroom → Study (cross-room),Bellman Ford,209.6,7.18,9,11006,45.0,True
+Bedroom → Study (cross-room),PRM,69.2,0.00,0,652,0.0,False
+Bedroom → Study (cross-room),RRT,4002.8,0.00,0,4573,0.0,False
+Bedroom → Study (cross-room),Theta*,32.6,6.79,4,1102,38.4,True
+Bedroom → Living (through door1),A*,5.1,7.24,32,863,45.0,True
+Bedroom → Living (through door1),Dijkstra,40.5,7.24,9,7876,45.0,True
+Bedroom → Living (through door1),Bellman Ford,553.3,7.24,6,62504,45.0,True
+Bedroom → Living (through door1),PRM,69.3,6.96,12,659,12.6,True
+Bedroom → Living (through door1),RRT,57.9,6.99,4,483,31.0,True
+Bedroom → Living (through door1),Theta*,16.1,6.80,4,432,34.1,True
+Living → Study (full traverse),A*,18.0,13.52,40,2995,45.0,True
+Living → Study (full traverse),Dijkstra,55.2,13.52,7,10506,45.0,True
+Living → Study (full traverse),Bellman Ford,1033.6,13.52,7,17447,45.0,True
+Living → Study (full traverse),PRM,64.2,0.00,0,650,0.0,False
+Living → Study (full traverse),RRT,47.5,0.00,0,1,0.0,False
+Living → Study (full traverse),Theta*,30.5,12.57,4,637,9.9,True
+Short: within Bedroom,A*,0.3,4.00,2,40,0.0,True
+Short: within Bedroom,Dijkstra,15.8,4.00,2,3011,0.0,True
+Short: within Bedroom,Bellman Ford,453.2,4.00,2,9978,0.0,True
+Short: within Bedroom,PRM,66.1,4.18,7,651,20.3,True
+Short: within Bedroom,RRT,0.5,4.00,2,33,0.0,True
+Short: within Bedroom,Theta*,2.1,4.00,2,40,0.0,True
+Diagonal: corner to corner,A*,24.3,17.55,37,3836,45.0,True
+Diagonal: corner to corner,Dijkstra,63.0,17.55,7,12103,45.0,True
+Diagonal: corner to corner,Bellman Ford,1491.6,17.55,7,16728,45.0,True
+Diagonal: corner to corner,PRM,64.8,0.00,0,653,0.0,False
+Diagonal: corner to corner,RRT,47.3,0.00,0,1,0.0,False
+Diagonal: corner to corner,Theta*,50.7,16.40,6,898,15.7,True

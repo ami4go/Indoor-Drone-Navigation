@@ -297,6 +297,7 @@ class AutonomousNavigator(Node):
         self.state = 'INIT'
         self.waypoints = []      # Current A* path waypoints
         self.wp_idx = 0
+        self.goal_xy = None      # Store goal for replanning
 
         # Exploration state
         self.scan_wp_idx = 0     # Which scan waypoint we're heading to
@@ -310,6 +311,15 @@ class AutonomousNavigator(Node):
         self.YAW_STEP = 0.04         # Radians per control tick during rotation
         self.SAFETY_MARGIN = 0.25     # Obstacle inflation for A* (metres)
         # Doorway clearance: 2.5m - 2*(0.075 wall + 0.25 inflate) = 1.85m gap ✅
+
+        # Stability: velocity clamping + yaw smoothing
+        self.MAX_NAV_DELTA = 1.5     # Max target distance from drone (metres)
+        self.current_yaw = 0.0       # Smoothed yaw angle (radians)
+        self.YAW_SMOOTH = 0.15       # Yaw interpolation factor (0=no turn, 1=snap)
+
+        # Obstacle avoidance: check path every N ticks
+        self.AVOIDANCE_CHECK_INTERVAL = 40  # Check every 40 ticks (2 seconds at 20Hz)
+        self.avoidance_tick = 0
 
         # ── Control timer: 20 Hz ──
         self.create_timer(0.05, self.control_loop)
@@ -379,13 +389,14 @@ class AutonomousNavigator(Node):
         if path:
             self.waypoints = path
             self.wp_idx = 0
+            self.goal_xy = (gx, gy)  # Store for replanning
             self.state = 'NAVIGATING'
             self._publish_rviz_path(path)
             print(f"   ✅ Path found — {len(path)} waypoints. Flying!")
         else:
             print("   ❌ No path found. Try a different target.")
 
-    # ── Control Loop ──────────────────────────────────────────────────────────
+    # ── Control Loop ──────────────────────────────────────────────────────────────────
 
     def control_loop(self):
         if self.px4_pos is None or self.gz_pos is None:
@@ -466,35 +477,103 @@ class AutonomousNavigator(Node):
     # ── Navigation Phase ──────────────────────────────────────────────────────
 
     def _navigate_step(self):
-        """Follow A* waypoints to the goal."""
+        """Follow A* waypoints to the goal with velocity clamping."""
 
         if self.wp_idx >= len(self.waypoints):
             print("  🎉 DESTINATION REACHED! Set a new goal in RViz.")
             self.waypoints = []
+            self.goal_xy = None
             self.state = 'READY'
             return
+
+        # Obstacle avoidance: periodically check if path is still clear
+        self.avoidance_tick += 1
+        if (self.avoidance_tick % self.AVOIDANCE_CHECK_INTERVAL == 0
+                and self.goal_xy is not None
+                and self.occupancy_grid is not None):
+            if self._path_blocked():
+                print("  ⚠️  Obstacle detected on path! Replanning...")
+                self._replan()
+                return
 
         wx, wy = self.waypoints[self.wp_idx]
 
         # Relative delta in Gazebo ENU
         dx_enu = wx - self.gz_pos[0]
         dy_enu = wy - self.gz_pos[1]
+        dist = math.hypot(dx_enu, dy_enu)
+
+        # Velocity clamping: limit target distance so drone moves smoothly
+        if dist > self.MAX_NAV_DELTA:
+            scale = self.MAX_NAV_DELTA / dist
+            dx_enu *= scale
+            dy_enu *= scale
 
         # Convert ENU delta → NED target
-        # ENU: X=East, Y=North → NED: X=North, Y=East
         tgt_px4_x = self.px4_pos[0] + dy_enu
         tgt_px4_y = self.px4_pos[1] + dx_enu
         tgt_px4_z = -self.ALTITUDE
 
-        # Point drone towards the waypoint
-        target_yaw = math.atan2(dx_enu, dy_enu)
-        self._send_position(tgt_px4_x, tgt_px4_y, tgt_px4_z, yaw=target_yaw)
+        # Yaw smoothing: interpolate toward target instead of snapping
+        target_yaw = math.atan2(wx - self.gz_pos[0], wy - self.gz_pos[1])
+        yaw_diff = target_yaw - self.current_yaw
+        # Normalize to [-pi, pi]
+        yaw_diff = (yaw_diff + math.pi) % (2 * math.pi) - math.pi
+        self.current_yaw += self.YAW_SMOOTH * yaw_diff
+        self._send_position(tgt_px4_x, tgt_px4_y, tgt_px4_z, yaw=self.current_yaw)
 
-        dist = math.hypot(dx_enu, dy_enu)
         if dist < self.WP_REACH_DIST:
             self.wp_idx += 1
             if self.wp_idx < len(self.waypoints):
                 print(f"  📍 WP {self.wp_idx}/{len(self.waypoints)} — {dist:.2f}m")
+
+    def _path_blocked(self):
+        """Check if upcoming waypoints collide with latest OctoMap."""
+        if self.occupancy_grid is None:
+            return False
+
+        info = self.occupancy_grid.info
+        raw = np.array(self.occupancy_grid.data).reshape((info.height, info.width))
+        margin_cells = int(math.ceil(self.SAFETY_MARGIN / info.resolution))
+
+        # Check next 3 waypoints (or remaining)
+        check_end = min(self.wp_idx + 3, len(self.waypoints))
+        for i in range(self.wp_idx, check_end):
+            wx, wy = self.waypoints[i]
+            c = int((wx - info.origin.position.x) / info.resolution)
+            r = int((wy - info.origin.position.y) / info.resolution)
+
+            # Check the cell and its immediate neighbors
+            for dr in range(-margin_cells, margin_cells + 1):
+                for dc in range(-margin_cells, margin_cells + 1):
+                    cr, cc = r + dr, c + dc
+                    if (0 <= cr < info.height and 0 <= cc < info.width
+                            and raw[cr, cc] > 50):
+                        return True
+        return False
+
+    def _replan(self):
+        """Replan from current position to stored goal."""
+        if self.goal_xy is None or self.occupancy_grid is None:
+            return
+
+        # Hover while replanning
+        self._send_position(self.px4_pos[0], self.px4_pos[1], -self.ALTITUDE)
+
+        planner = SensorMapPlanner(self.occupancy_grid, safety_margin=self.SAFETY_MARGIN)
+        path = planner.plan(self.gz_pos[0], self.gz_pos[1],
+                            self.goal_xy[0], self.goal_xy[1])
+
+        if path:
+            self.waypoints = path
+            self.wp_idx = 0
+            self._publish_rviz_path(path)
+            print(f"  ✅ Replanned — {len(path)} waypoints. Resuming!")
+        else:
+            print("  ❌ Replan failed — hovering. Try a new goal.")
+            self.waypoints = []
+            self.goal_xy = None
+            self.state = 'READY'
 
     # ── Takeoff ───────────────────────────────────────────────────────────────
 

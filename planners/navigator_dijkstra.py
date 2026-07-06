@@ -1,31 +1,30 @@
 #!/usr/bin/env python3
 """
 =============================================================================
- AUTONOMOUS THETA* NAVIGATOR — Any-Angle Path Planning
- File: navigator_theta_star.py
+ AUTONOMOUS DIJKSTRA NAVIGATOR — Uniform Cost Search Path Planning
+ File: navigator_dijkstra.py
 =============================================================================
 
- Uses the same sensor-based pipeline as autonomous_navigator.py (A*),
- but replaces A* with Theta* — an any-angle path planning algorithm.
+ Uses the same sensor-based pipeline as navigator_astar.py,
+ but replaces A* with Dijkstra's algorithm.
 
- Theta* Algorithm:
-   Same as A* but with one key addition: when expanding a neighbor,
-   check if there is LINE-OF-SIGHT from the neighbor's GRANDPARENT.
-   If yes, connect directly (skip the parent), creating a shorter
-   straight-line shortcut at any angle, not just 45/90 degrees.
+ Dijkstra's Algorithm:
+   Identical to A* but WITHOUT the heuristic: f(n) = g(n) only.
+   This means the algorithm explores equally in all directions
+   (like a spreading circle) instead of being guided toward the goal.
 
- Advantages over A*:
-   - Produces smoother, shorter paths (true geometric shortest path)
-   - Paths can go at any angle, not locked to 8 grid directions
-   - Same optimality guarantee as A*
+ Comparison with A*:
+   - Produces the EXACT SAME optimal path as A*
+   - But explores significantly MORE nodes because there is no
+     heuristic to bias the search toward the goal
+   - This makes it slower on large maps
 
- Advantages over RRT:
-   - Deterministic — same input always gives same output
-   - Optimal — guaranteed shortest any-angle path
-   - Smooth — no jagged turns
+ Why study it:
+   Dijkstra is the theoretical foundation of A*. Understanding that
+   A* = Dijkstra + heuristic shows why the heuristic matters.
 
  Launch:
-   ~/Desktop/Drone_IP/launch_sim.sh --auto --algo theta
+   ~/Desktop/Drone_IP/launch_sim.sh --auto --algo dijkstra
 
 =============================================================================
 """
@@ -49,7 +48,7 @@ from px4_msgs.msg import (
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  EXPLORATION WAYPOINTS (same as A* navigator)
+#  EXPLORATION WAYPOINTS (same as all navigators)
 # ─────────────────────────────────────────────────────────────────────────────
 SCAN_WAYPOINTS = [
     ( 0.0,  0.0),
@@ -69,19 +68,19 @@ SCAN_WAYPOINTS = [
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  THETA* PLANNER — Any-Angle A* on OctoMap's /projected_map
+#  DIJKSTRA PLANNER — Uniform Cost Search on OctoMap's /projected_map
 # ─────────────────────────────────────────────────────────────────────────────
-class ThetaStarPlanner:
+class DijkstraPlanner:
     """
-    Theta* path planner — A* with line-of-sight shortcuts.
+    Dijkstra's algorithm — A* without the heuristic.
 
-    The key difference from A*:
-      When expanding a neighbor N of current node C:
-        - A*:     always sets parent(N) = C
-        - Theta*: checks line-of-sight from parent(C) to N.
-                  If clear, sets parent(N) = parent(C) and computes
-                  g(N) as the straight-line distance from parent(C).
-                  This creates diagonal shortcuts at any angle.
+    The ONLY difference from A*:
+      A*:       f = g + h  (g = cost so far, h = estimated distance to goal)
+      Dijkstra: f = g      (no heuristic — explores uniformly in all directions)
+
+    This means Dijkstra expands nodes in a circular wavefront from the start,
+    while A* expands in an ellipse focused toward the goal. Both find the
+    optimal path, but A* does it with fewer node expansions.
     """
 
     def __init__(self, occupancy_grid_msg, safety_margin=0.25):
@@ -92,15 +91,14 @@ class ThetaStarPlanner:
         self.width = info.width
         self.height = info.height
 
-        # Convert 1D occupancy data to 2D numpy grid
         raw = np.array(occupancy_grid_msg.data).reshape((self.height, self.width))
         self.grid = np.where(raw > 50, 1, 0).astype(np.uint8)
-
-        # Inflate obstacles for safety
         self._inflate(safety_margin)
 
+        # Benchmark metric: count how many nodes we explore
+        self.nodes_explored = 0
+
     def _inflate(self, margin_m):
-        """Grow obstacle cells by margin_m meters in all directions."""
         cells = int(math.ceil(margin_m / self.resolution))
         if cells <= 0:
             return
@@ -129,36 +127,105 @@ class ThetaStarPlanner:
                 0 <= c < self.width and
                 self.grid[r, c] == 0)
 
-    def _line_of_sight(self, r1, c1, r2, c2):
+    def plan(self, sx, sy, gx, gy):
         """
-        Bresenham's line algorithm to check if all cells between
-        (r1,c1) and (r2,c2) are free. This is the core of Theta*.
+        Dijkstra from (sx, sy) to (gx, gy) in world coordinates.
+
+        Key difference from A*: the priority is f = g only (no heuristic).
         """
-        dr = abs(r2 - r1)
-        dc = abs(c2 - c1)
-        sr = 1 if r2 > r1 else -1
-        sc = 1 if c2 > c1 else -1
+        t0 = time.time()
+        self.nodes_explored = 0
 
-        r, c = r1, c1
-        err = dr - dc
+        start = self.world_to_grid(sx, sy)
+        goal = self.world_to_grid(gx, gy)
 
-        while True:
-            if not self.is_free(r, c):
-                return False
-            if r == r2 and c == c2:
+        goal = (
+            max(0, min(self.height - 1, goal[0])),
+            max(0, min(self.width - 1, goal[1]))
+        )
+        start = (
+            max(0, min(self.height - 1, start[0])),
+            max(0, min(self.width - 1, start[1]))
+        )
+
+        if not self.is_free(*start):
+            print(f"  Start ({sx:.2f},{sy:.2f}) is in obstacle — nudging")
+            start = self._nearest_free(start)
+            if start is None:
+                print("  Cannot find free start cell!")
+                return None
+
+        if not self.is_free(*goal):
+            print(f"  Goal ({gx:.2f},{gy:.2f}) is in obstacle — nudging")
+            goal = self._nearest_free(goal)
+            if goal is None:
+                print("  Cannot find free goal cell!")
+                return None
+
+        print(f"  Dijkstra: Searching (no heuristic — uniform expansion)...")
+
+        # Dijkstra with 8-connectivity
+        open_set = []
+        counter = 0
+        heapq.heappush(open_set, (0.0, counter, start))
+        came_from = {start: None}
+        g = {start: 0.0}
+        closed = set()
+
+        dirs = [(0, 1), (1, 0), (0, -1), (-1, 0),
+                (1, 1), (1, -1), (-1, 1), (-1, -1)]
+
+        while open_set:
+            cost, _, cur = heapq.heappop(open_set)
+
+            if cur == goal:
                 break
-            e2 = 2 * err
-            if e2 > -dc:
-                err -= dc
-                r += sr
-            if e2 < dr:
-                err += dr
-                c += sc
 
-        return True
+            if cur in closed:
+                continue
+            closed.add(cur)
+            self.nodes_explored += 1
+
+            for dr, dc in dirs:
+                nxt = (cur[0] + dr, cur[1] + dc)
+                if not self.is_free(*nxt):
+                    continue
+                if nxt in closed:
+                    continue
+
+                step = 1.414 if (dr != 0 and dc != 0) else 1.0
+                ng = g[cur] + step
+
+                if ng < g.get(nxt, float('inf')):
+                    g[nxt] = ng
+                    came_from[nxt] = cur
+                    # === THE KEY DIFFERENCE FROM A* ===
+                    # A*:       f = ng + math.hypot(goal[0]-nxt[0], goal[1]-nxt[1])
+                    # Dijkstra: f = ng   (no heuristic)
+                    f = ng
+                    counter += 1
+                    heapq.heappush(open_set, (f, counter, nxt))
+
+        dt = (time.time() - t0) * 1000
+
+        if goal not in came_from:
+            print(f"  Dijkstra: No path found! ({dt:.0f}ms, {self.nodes_explored} nodes)")
+            return None
+
+        # Reconstruct path
+        path = []
+        cur = goal
+        while cur is not None:
+            path.append(self.grid_to_world(*cur))
+            cur = came_from[cur]
+        path.reverse()
+        path = self._simplify(path)
+
+        print(f"  Dijkstra: Path found — {len(path)} waypoints "
+              f"({dt:.0f}ms, {self.nodes_explored} nodes explored)")
+        return path
 
     def _nearest_free(self, cell):
-        """BFS outward to find the nearest free cell."""
         visited = {cell}
         queue = [cell]
         while queue:
@@ -175,129 +242,25 @@ class ThetaStarPlanner:
             queue = next_queue
         return None
 
-    def plan(self, sx, sy, gx, gy):
-        """
-        Theta* from (sx, sy) to (gx, gy) in world coordinates.
-
-        Like A* but with line-of-sight checks: when a neighbor can
-        "see" the grandparent directly, the parent is skipped and
-        the path takes a straight-line shortcut at any angle.
-        """
-        t0 = time.time()
-
-        start = self.world_to_grid(sx, sy)
-        goal = self.world_to_grid(gx, gy)
-
-        # Clamp to grid bounds
-        goal = (
-            max(0, min(self.height - 1, goal[0])),
-            max(0, min(self.width - 1, goal[1]))
-        )
-        start = (
-            max(0, min(self.height - 1, start[0])),
-            max(0, min(self.width - 1, start[1]))
-        )
-
-        # Nudge if start/goal is inside an obstacle
-        if not self.is_free(*start):
-            print(f"  Start ({sx:.2f},{sy:.2f}) is in obstacle — nudging")
-            start = self._nearest_free(start)
-            if start is None:
-                print("  Cannot find free start cell!")
-                return None
-
-        if not self.is_free(*goal):
-            print(f"  Goal ({gx:.2f},{gy:.2f}) is in obstacle — nudging")
-            goal = self._nearest_free(goal)
-            if goal is None:
-                print("  Cannot find free goal cell!")
-                return None
-
-        print(f"  Theta*: Searching with line-of-sight shortcuts...")
-
-        # Theta* search
-        open_set = []
-        counter = 0  # tie-breaker for heapq
-        heapq.heappush(open_set, (0.0, counter, start))
-        came_from = {start: start}  # start is its own parent
-        g = {start: 0.0}
-        closed = set()
-
-        dirs = [(0, 1), (1, 0), (0, -1), (-1, 0),
-                (1, 1), (1, -1), (-1, 1), (-1, -1)]
-
-        while open_set:
-            _, _, cur = heapq.heappop(open_set)
-
-            if cur == goal:
-                break
-
-            if cur in closed:
-                continue
-            closed.add(cur)
-
-            for dr, dc in dirs:
-                nxt = (cur[0] + dr, cur[1] + dc)
-
-                if not self.is_free(*nxt):
-                    continue
-                if nxt in closed:
-                    continue
-
-                # === THE THETA* DIFFERENCE ===
-                # Check line-of-sight from parent(cur) to nxt
-                parent_cur = came_from[cur]
-
-                if self._line_of_sight(parent_cur[0], parent_cur[1],
-                                       nxt[0], nxt[1]):
-                    # Path 1: grandparent -> nxt (straight line, any angle)
-                    new_g = g[parent_cur] + math.hypot(
-                        nxt[0] - parent_cur[0], nxt[1] - parent_cur[1])
-                    new_parent = parent_cur
-                else:
-                    # Path 2: standard A* — cur -> nxt (grid-locked)
-                    step = 1.414 if (dr != 0 and dc != 0) else 1.0
-                    new_g = g[cur] + step
-                    new_parent = cur
-
-                if new_g < g.get(nxt, float('inf')):
-                    g[nxt] = new_g
-                    came_from[nxt] = new_parent
-                    f = new_g + math.hypot(goal[0] - nxt[0], goal[1] - nxt[1])
-                    counter += 1
-                    heapq.heappush(open_set, (f, counter, nxt))
-
-        dt = (time.time() - t0) * 1000
-
-        if goal not in came_from:
-            print(f"  Theta*: No path found! ({dt:.0f}ms)")
-            return None
-
-        # Reconstruct path
-        path = []
-        cur = goal
-        while cur != came_from[cur]:  # stop when cur == start (parent of start is itself)
-            path.append(self.grid_to_world(*cur))
-            cur = came_from[cur]
-        path.append(self.grid_to_world(*start))
-        path.reverse()
-
-        print(f"  Theta*: Path found — {len(path)} waypoints ({dt:.0f}ms)")
-        return path
+    def _simplify(self, path):
+        if len(path) < 3:
+            return path
+        result = [path[0]]
+        for i in range(1, len(path) - 1):
+            dx1 = path[i][0] - path[i - 1][0]
+            dy1 = path[i][1] - path[i - 1][1]
+            dx2 = path[i + 1][0] - path[i][0]
+            dy2 = path[i + 1][1] - path[i][1]
+            if abs(dx1 * dy2 - dx2 * dy1) > 1e-4:
+                result.append(path[i])
+        result.append(path[-1])
+        return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  AUTONOMOUS NAVIGATOR NODE (uses ThetaStarPlanner)
+#  AUTONOMOUS NAVIGATOR NODE (uses DijkstraPlanner)
 # ─────────────────────────────────────────────────────────────────────────────
 class AutonomousNavigator(Node):
-    """
-    State Machine:
-      INIT       -> waiting for PX4 + Gazebo data
-      TAKEOFF    -> arming and ascending to flight altitude
-      EXPLORING  -> flying scan waypoints + rotating at each
-      READY      -> map built, hovering, waiting for user goal
-      NAVIGATING -> following Theta* path to goal
-    """
 
     def __init__(self):
         super().__init__('autonomous_navigator')
@@ -308,7 +271,6 @@ class AutonomousNavigator(Node):
             depth=5
         )
 
-        # Subscribers
         self.gz_sub = self.create_subscription(
             TFMessage, '/world/house_3room/dynamic_pose/info',
             self.gz_pose_cb, qos)
@@ -322,7 +284,6 @@ class AutonomousNavigator(Node):
             OccupancyGrid, '/projected_map',
             self.map_cb, 10)
 
-        # Publishers
         self.path_pub = self.create_publisher(Path, '/plan', 10)
         self.offboard_pub = self.create_publisher(
             OffboardControlMode, '/fmu/in/offboard_control_mode', qos)
@@ -331,7 +292,6 @@ class AutonomousNavigator(Node):
         self.command_pub = self.create_publisher(
             VehicleCommand, '/fmu/in/vehicle_command', qos)
 
-        # State
         self.gz_pos = None
         self.px4_pos = None
         self.occupancy_grid = None
@@ -339,13 +299,12 @@ class AutonomousNavigator(Node):
         self.state = 'INIT'
         self.waypoints = []
         self.wp_idx = 0
+        self.goal_xy = None
 
-        # Exploration state
         self.scan_wp_idx = 0
         self.scan_yaw = 0.0
         self.scan_rotating = False
 
-        # Parameters
         self.ALTITUDE = 1.8
         self.WP_REACH_DIST = 0.4
         self.SCAN_WP_REACH = 0.5
@@ -361,20 +320,14 @@ class AutonomousNavigator(Node):
         self.AVOIDANCE_CHECK_INTERVAL = 40
         self.avoidance_tick = 0
 
-        # Control timer: 20 Hz
         self.create_timer(0.05, self.control_loop)
 
         print("\n╔══════════════════════════════════════════════════════════╗")
-        print("║   📐 AUTONOMOUS THETA* NAVIGATOR — ANY-ANGLE          ║")
+        print("║   🔵 AUTONOMOUS DIJKSTRA NAVIGATOR — SENSOR-BASED     ║")
         print("╠══════════════════════════════════════════════════════════╣")
-        print("║  Phase 1: Takeoff -> 1.8m                              ║")
-        print("║  Phase 2: Explore rooms (13 scan positions, 360 each)  ║")
-        print("║  Phase 3: OctoMap builds 3D map from depth camera      ║")
-        print("║  Phase 4: Click '2D Goal Pose' in RViz                 ║")
-        print("║  Phase 5: Theta* plans any-angle path -> drone flies!  ║")
+        print("║  Dijkstra = A* without heuristic (uniform expansion)   ║")
+        print("║  Same optimal path, but explores more nodes            ║")
         print("╚══════════════════════════════════════════════════════════╝\n")
-
-    # Callbacks
 
     def gz_pose_cb(self, msg):
         for tf in msg.transforms:
@@ -394,7 +347,7 @@ class AutonomousNavigator(Node):
 
     def goal_cb(self, msg):
         if self.state != 'READY':
-            print("Warning: Drone is not ready yet! Wait for exploration to complete.")
+            print("Warning: Drone is not ready yet!")
             return
         if self.occupancy_grid is None:
             print("Warning: No sensor map available!")
@@ -408,7 +361,7 @@ class AutonomousNavigator(Node):
 
         print(f"\n  Goal received: ({gx:.2f}, {gy:.2f})")
         print(f"   Drone is at: ({self.gz_pos[0]:.2f}, {self.gz_pos[1]:.2f})")
-        print(f"   Planning with Theta* (any-angle A*)...")
+        print(f"   Planning with Dijkstra (uniform cost search)...")
 
         grid_info = self.occupancy_grid.info
         total_cells = grid_info.width * grid_info.height
@@ -417,8 +370,8 @@ class AutonomousNavigator(Node):
               f"resolution={grid_info.resolution:.2f}m, "
               f"occupied={occupied}/{total_cells}")
 
-        planner = ThetaStarPlanner(self.occupancy_grid,
-                                   safety_margin=self.SAFETY_MARGIN)
+        planner = DijkstraPlanner(self.occupancy_grid,
+                                  safety_margin=self.SAFETY_MARGIN)
         path = planner.plan(self.gz_pos[0], self.gz_pos[1], gx, gy)
 
         if path:
@@ -430,8 +383,6 @@ class AutonomousNavigator(Node):
             print(f"   Path found with {len(path)} waypoints. Flying!")
         else:
             print("   No path found. Try a different target.")
-
-    # Control Loop
 
     def control_loop(self):
         if self.px4_pos is None or self.gz_pos is None:
@@ -446,8 +397,6 @@ class AutonomousNavigator(Node):
             self._navigate_step()
         elif self.state == 'READY':
             self._send_position(self.px4_pos[0], self.px4_pos[1], -self.ALTITUDE)
-
-    # Exploration Phase
 
     def _explore_step(self):
         if self.scan_wp_idx >= len(SCAN_WAYPOINTS):
@@ -489,8 +438,6 @@ class AutonomousNavigator(Node):
             if self.scan_yaw >= 2 * math.pi:
                 self.scan_rotating = False
                 self.scan_wp_idx += 1
-
-    # Navigation Phase
 
     def _navigate_step(self):
         if self.wp_idx >= len(self.waypoints):
@@ -558,7 +505,7 @@ class AutonomousNavigator(Node):
         if self.goal_xy is None or self.occupancy_grid is None:
             return
         self._send_position(self.px4_pos[0], self.px4_pos[1], -self.ALTITUDE)
-        planner = ThetaStarPlanner(self.occupancy_grid, safety_margin=self.SAFETY_MARGIN)
+        planner = DijkstraPlanner(self.occupancy_grid, safety_margin=self.SAFETY_MARGIN)
         path = planner.plan(self.gz_pos[0], self.gz_pos[1],
                             self.goal_xy[0], self.goal_xy[1])
         if path:
@@ -575,7 +522,6 @@ class AutonomousNavigator(Node):
     def _takeoff(self):
         print("  Takeoff sequence starting...")
         hover_z = -self.ALTITUDE
-        print("  Sending warmup heartbeats...")
         for _ in range(30):
             self._heartbeat()
             self._send_position(self.px4_pos[0], self.px4_pos[1], hover_z)
@@ -601,8 +547,6 @@ class AutonomousNavigator(Node):
         self.scan_rotating = False
         print(f"\n  Airborne at {self.ALTITUDE}m!")
         print(f"  Starting room exploration ({len(SCAN_WAYPOINTS)} scan positions)...\n")
-
-    # Helpers
 
     def _heartbeat(self):
         msg = OffboardControlMode()

@@ -24,9 +24,9 @@ Visualization Manager:
       Reference Frame: <Fixed Frame>
       Color: 80; 80; 80
 
-    # ── OctoMap 3D Obstacles (GREY) ─────────────────────────────────────────
+    # ── OctoMap 3D Obstacles (Semantic Colors) ─────────────────────────────
     - Class: rviz_default_plugins/MarkerArray
-      Name: "OctoMap — Obstacles (Grey)"
+      Name: "OctoMap — Semantic 3D Map"
       Enabled: true
       Topic:
         Value: /occupied_cells_vis_array
@@ -93,6 +93,34 @@ Visualization Manager:
       Color: 200; 200; 200
       Decay Time: 0
       Use Fixed Frame: true
+
+    # ── Semantic Colored Point Cloud (YOLOv8 labels) ────────────────────────
+    - Class: rviz_default_plugins/PointCloud2
+      Name: "Semantic 3D Map (Colored)"
+      Enabled: true
+      Topic:
+        Value: /semantic/colored_points
+        Depth: 1
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+      Size (Pixels): 5
+      Style: Points
+      Color Transformer: RGB8
+      Decay Time: 120
+      Use Fixed Frame: true
+
+    # ── Semantic Camera Overlay (YOLOv8 annotated feed) ─────────────────────
+    - Class: rviz_default_plugins/Image
+      Name: "Semantic Camera"
+      Enabled: true
+      Topic:
+        Value: /semantic/overlay
+        Depth: 1
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+      Max Value: 1
+      Min Value: 0
+      Normalize Range: true
 
   Global Options:
     Background Color: 20; 20; 20

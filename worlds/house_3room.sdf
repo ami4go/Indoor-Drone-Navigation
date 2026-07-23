@@ -307,6 +307,130 @@
     </model>
 
     <!-- ============================================================ -->
+    <!-- CEILING OBSTACLES — Fans, lights, pipes (Phase 3)            -->
+    <!-- These hang from the 3.0m ceiling into the drone flight zone  -->
+    <!-- ============================================================ -->
+
+    <!-- Ceiling Fan — Bedroom (center of room, directly above spawn) -->
+    <!-- Fan hub at z=2.7, blades extend down to z=2.55              -->
+    <!-- Above default 1.8m altitude but visible in OctoMap 3D       -->
+    <model name="ceiling_fan_bedroom">
+      <static>true</static>
+      <link name="link">
+        <!-- Center rod hanging from ceiling -->
+        <collision name="rod_col"><pose>0 0 2.85 0 0 0</pose>
+          <geometry><cylinder><radius>0.03</radius><length>0.3</length></cylinder></geometry>
+        </collision>
+        <visual name="rod_vis"><pose>0 0 2.85 0 0 0</pose>
+          <geometry><cylinder><radius>0.03</radius><length>0.3</length></cylinder></geometry>
+          <material><ambient>0.4 0.4 0.42 1</ambient><diffuse>0.4 0.4 0.42 1</diffuse></material>
+        </visual>
+        <!-- Fan motor hub -->
+        <collision name="hub_col"><pose>0 0 2.65 0 0 0</pose>
+          <geometry><cylinder><radius>0.12</radius><length>0.1</length></cylinder></geometry>
+        </collision>
+        <visual name="hub_vis"><pose>0 0 2.65 0 0 0</pose>
+          <geometry><cylinder><radius>0.12</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.3 0.3 0.32 1</ambient><diffuse>0.3 0.3 0.32 1</diffuse></material>
+        </visual>
+        <!-- Fan blades (flat disc representing 4 blades) -->
+        <collision name="blades_col"><pose>0 0 2.55 0 0 0</pose>
+          <geometry><cylinder><radius>0.6</radius><length>0.04</length></cylinder></geometry>
+        </collision>
+        <visual name="blades_vis"><pose>0 0 2.55 0 0 0</pose>
+          <geometry><cylinder><radius>0.6</radius><length>0.04</length></cylinder></geometry>
+          <material><ambient>0.5 0.45 0.35 1</ambient><diffuse>0.5 0.45 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Ceiling Fan — Living Room (above coffee table area) -->
+    <!-- Placed at (-6, 1) — directly in the cross-room flight path -->
+    <model name="ceiling_fan_living">
+      <static>true</static>
+      <link name="link">
+        <collision name="rod_col"><pose>-6 1 2.85 0 0 0</pose>
+          <geometry><cylinder><radius>0.03</radius><length>0.3</length></cylinder></geometry>
+        </collision>
+        <visual name="rod_vis"><pose>-6 1 2.85 0 0 0</pose>
+          <geometry><cylinder><radius>0.03</radius><length>0.3</length></cylinder></geometry>
+          <material><ambient>0.4 0.4 0.42 1</ambient><diffuse>0.4 0.4 0.42 1</diffuse></material>
+        </visual>
+        <collision name="hub_col"><pose>-6 1 2.65 0 0 0</pose>
+          <geometry><cylinder><radius>0.12</radius><length>0.1</length></cylinder></geometry>
+        </collision>
+        <visual name="hub_vis"><pose>-6 1 2.65 0 0 0</pose>
+          <geometry><cylinder><radius>0.12</radius><length>0.1</length></cylinder></geometry>
+          <material><ambient>0.3 0.3 0.32 1</ambient><diffuse>0.3 0.3 0.32 1</diffuse></material>
+        </visual>
+        <collision name="blades_col"><pose>-6 1 2.55 0 0 0</pose>
+          <geometry><cylinder><radius>0.6</radius><length>0.04</length></cylinder></geometry>
+        </collision>
+        <visual name="blades_vis"><pose>-6 1 2.55 0 0 0</pose>
+          <geometry><cylinder><radius>0.6</radius><length>0.04</length></cylinder></geometry>
+          <material><ambient>0.5 0.45 0.35 1</ambient><diffuse>0.5 0.45 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Hanging Pendant Light — Near Door 1 (Bedroom-Living Room doorway) -->
+    <!-- Hangs LOW at z=2.05 — forces altitude awareness near doorways    -->
+    <model name="hanging_light_door1">
+      <static>true</static>
+      <link name="link">
+        <!-- Thin wire from ceiling -->
+        <collision name="wire_col"><pose>-3 2 2.55 0 0 0</pose>
+          <geometry><cylinder><radius>0.01</radius><length>0.9</length></cylinder></geometry>
+        </collision>
+        <visual name="wire_vis"><pose>-3 2 2.55 0 0 0</pose>
+          <geometry><cylinder><radius>0.01</radius><length>0.9</length></cylinder></geometry>
+          <material><ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse></material>
+        </visual>
+        <!-- Light fixture (sphere) -->
+        <collision name="light_col"><pose>-3 2 2.05 0 0 0</pose>
+          <geometry><sphere><radius>0.15</radius></sphere></geometry>
+        </collision>
+        <visual name="light_vis"><pose>-3 2 2.05 0 0 0</pose>
+          <geometry><sphere><radius>0.15</radius></sphere></geometry>
+          <material><ambient>0.95 0.85 0.3 1</ambient><diffuse>0.95 0.85 0.3 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Low Horizontal Pipe — Study Room                                -->
+    <!-- At z=1.9m — EXACTLY at drone flight altitude!                   -->
+    <!-- This is the CRITICAL TEST CASE: drone MUST change altitude      -->
+    <!-- Runs East-West across the room at (6, 0)                        -->
+    <model name="low_pipe_study">
+      <static>true</static>
+      <link name="link">
+        <!-- Horizontal pipe (rotated 90° around Y to lay flat along X) -->
+        <collision name="pipe_col"><pose>6 0 1.9 0 1.5708 0</pose>
+          <geometry><cylinder><radius>0.08</radius><length>2.0</length></cylinder></geometry>
+        </collision>
+        <visual name="pipe_vis"><pose>6 0 1.9 0 1.5708 0</pose>
+          <geometry><cylinder><radius>0.08</radius><length>2.0</length></cylinder></geometry>
+          <material><ambient>0.72 0.45 0.2 1</ambient><diffuse>0.72 0.45 0.2 1</diffuse></material>
+        </visual>
+        <!-- Pipe brackets (2 mounting brackets on wall/ceiling) -->
+        <collision name="bracket1_col"><pose>5 0 2.45 0 0 0</pose>
+          <geometry><box><size>0.06 0.06 1.1</size></box></geometry>
+        </collision>
+        <visual name="bracket1_vis"><pose>5 0 2.45 0 0 0</pose>
+          <geometry><box><size>0.06 0.06 1.1</size></box></geometry>
+          <material><ambient>0.5 0.5 0.52 1</ambient><diffuse>0.5 0.5 0.52 1</diffuse></material>
+        </visual>
+        <collision name="bracket2_col"><pose>7 0 2.45 0 0 0</pose>
+          <geometry><box><size>0.06 0.06 1.1</size></box></geometry>
+        </collision>
+        <visual name="bracket2_vis"><pose>7 0 2.45 0 0 0</pose>
+          <geometry><box><size>0.06 0.06 1.1</size></box></geometry>
+          <material><ambient>0.5 0.5 0.52 1</ambient><diffuse>0.5 0.5 0.52 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ============================================================ -->
     <!-- MARKERS — Start (green) and Destination (blue)               -->
     <!-- ============================================================ -->
 

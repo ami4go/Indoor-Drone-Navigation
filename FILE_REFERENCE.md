@@ -21,6 +21,7 @@ Quick reference for every file in this project and what it does.
 | `navigator_rrt.py` | RRT (Rapidly-exploring Random Tree) | Done |
 | `navigator_theta_star.py` | Theta* (any-angle A*) | Done |
 | `navigator_benchmark.py` | Visual Benchmark (runs all 6, colored paths) | Done |
+| `planner_3d.py` | 2.5D multi-layer planner (3 altitude layers, A* + Theta*) | Done |
 
 ## core/ — Shared Drone Infrastructure
 | File | Purpose |
@@ -29,11 +30,13 @@ Quick reference for every file in this project and what it does.
 | `tf_broadcaster.py` | Publishes drone position as TF transforms (map -> base_link -> camera) |
 | `pointcloud_filter.py` | Voxel Grid + Statistical Outlier Removal filter (307K -> 170 pts) |
 | `room_scanner.py` | Automated room scanning flight patterns |
+| `octomap_3d_query.py` | 3D OctoMap voxel query interface (hash set, O(1) lookups) |
+| `semantic_pointcloud.py` | YOLOv8n-seg + depth fusion → colored XYZRGB PointCloud2 for semantic OctoMap |
 
 ## worlds/ — Gazebo SDF Environments
 | File | Description |
 |------|-------------|
-| `house_3room.sdf` | Active: 18x12m house, 3 rooms, staggered doorways, 12 furniture items |
+| `house_3room.sdf` | Active: 18x12m house, 3 rooms, staggered doorways, 12 furniture items + ceiling fans, hanging light, low pipe |
 | `indoor_10x8x3.sdf` | Legacy: 10x8m single room with 3 color-coded obstacles |
 
 ## config/ — Configuration

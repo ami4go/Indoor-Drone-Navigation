@@ -210,7 +210,7 @@ sleep 3  # Let controller initialize before starting bridge
 # Without this, your ROS 2 nodes can't see the depth camera data.
 echo "🌉 [Terminal 4] Starting Gazebo → ROS 2 Bridge..."
 open_terminal "T4 — GZ-ROS2 Bridge" \
-    "source /opt/ros/humble/setup.bash && echo '🌉 Bridging Gazebo depth topics to ROS 2...' && ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /depth_camera@sensor_msgs/msg/Image[gz.msgs.Image /depth_camera/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked /camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo /world/house_3room/dynamic_pose/info@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V"
+    "source /opt/ros/humble/setup.bash && echo '🌉 Bridging Gazebo topics to ROS 2 (depth + RGB + pose)...' && ros2 run ros_gz_bridge parameter_bridge /clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock /depth_camera@sensor_msgs/msg/Image[gz.msgs.Image /depth_camera/points@sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked /camera@sensor_msgs/msg/Image[gz.msgs.Image /camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo /world/house_3room/dynamic_pose/info@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V"
 
 sleep 3  # Let bridge initialize before starting filter
 
@@ -246,19 +246,31 @@ sleep 3  # TF must be running before OctoMap starts
 # --- Terminal 8: OctoMap Server -----------------------------------------------
 # Builds a persistent 3D occupancy map from the RAW point cloud.
 # OctoMap handles its own spatial resolution — no pre-filtering needed.
+# NOTE: colored_map requires building octomap_server from source with COLOR_OCTOMAP.
+# We keep grey OctoMap for geometry + separate colored PointCloud2 for semantics.
 echo "🗺️  [Terminal 8] Starting OctoMap Server..."
 open_terminal "T8 — OctoMap Server" \
     "source /opt/ros/humble/setup.bash && echo '🗺️  Starting OctoMap Server...' && ros2 run octomap_server octomap_server_node --ros-args -p use_sim_time:=true -r cloud_in:=/depth_camera/points -p resolution:=0.10 -p frame_id:=map -p sensor_model.max_range:=5.0 -p sensor_model.min_range:=0.3 -p sensor_model.hit:=0.7 -p sensor_model.miss:=0.4 -p occupancy_min_z:=0.15 -p occupancy_max_z:=3.0 -p height_map:=false -p color.r:=0.6 -p color.g:=0.6 -p color.b:=0.6 -p color.a:=1.0"
 
+sleep 2
+
+# --- Terminal 9: Semantic Segmentation Pipeline --------------------------------
+# Runs YOLOv8 on the RGB camera feed, fuses semantic labels with the depth
+# point cloud, and publishes colored XYZRGB points for the OctoMap.
+# SEMANTIC_SCRIPT="$HOME/Desktop/Drone_IP/core/semantic_pointcloud.py"
+# echo "🧠 [Terminal 9] Starting Semantic Segmentation Pipeline..."
+# open_terminal "T9 — Semantic Pipeline" \
+#     "cd $ROS2_WS && source install/setup.bash && echo '🧠 Starting YOLOv8 Semantic Segmentation...' && python3 $SEMANTIC_SCRIPT --ros-args -p use_sim_time:=true"
+
 echo ""
 echo "=============================================="
-echo "  ✅ All 8 terminals launched!"
+echo "  ✅ All 9 terminals launched!"
 echo "=============================================="
 echo ""
 echo "  T1: DDS Bridge        — should show 'Agent running'"
 echo "  T2: PX4 + Gazebo      — wait for 'Ready for takeoff!'"
 echo "  T3: Keyboard Control  — manual override if needed"
-echo "  T4: GZ-ROS2 Bridge    — bridges depth camera + pose to ROS 2"
+echo "  T4: GZ-ROS2 Bridge    — bridges depth camera + RGB + pose to ROS 2"
 echo "  T5: PointCloud Filter — cleans raw point cloud data"
 echo "  T6: RViz2             — 3D point cloud + OctoMap visualization"
 echo "  T7: TF Broadcaster    — Gazebo ground-truth TF"

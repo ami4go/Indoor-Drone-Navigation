@@ -50,7 +50,6 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import PointCloud2, PointField
 import numpy as np
-from sensor_msgs_py import point_cloud2
 
 
 class PointCloudFilter(Node):
@@ -124,17 +123,27 @@ class PointCloudFilter(Node):
           raw points → remove NaN/Inf → clip range → voxel grid → outlier removal → publish
         """
 
-        # ── Step 1: Convert ROS message to numpy array ──
-        # point_cloud2.read_points() gives us a generator of (x, y, z, ...) tuples
-        points_list = []
-        for point in point_cloud2.read_points(msg, field_names=('x', 'y', 'z'), skip_nans=True):
-            points_list.append([point[0], point[1], point[2]])
+        # ── Step 1: Convert ROS message to numpy array (vectorized) ──
+        # Reshape the raw byte buffer to (n_points, point_step) and view the
+        # x/y/z float32 columns directly — ~100x faster than a Python loop.
+        point_step = msg.point_step
+        raw = np.frombuffer(bytes(msg.data), dtype=np.uint8)
+        n_points = len(raw) // point_step
 
-        if len(points_list) == 0:
+        if n_points == 0:
             return
 
-        points = np.array(points_list, dtype=np.float32)
-        raw_count = len(points)
+        offsets = {f.name: f.offset for f in msg.fields}
+        x_off = offsets.get('x', 0)
+        y_off = offsets.get('y', 4)
+        z_off = offsets.get('z', 8)
+
+        rows = raw[:n_points * point_step].reshape(n_points, point_step)
+        points = np.empty((n_points, 3), dtype=np.float32)
+        points[:, 0] = rows[:, x_off:x_off + 4].copy().view(np.float32)[:, 0]
+        points[:, 1] = rows[:, y_off:y_off + 4].copy().view(np.float32)[:, 0]
+        points[:, 2] = rows[:, z_off:z_off + 4].copy().view(np.float32)[:, 0]
+        raw_count = n_points
 
         # ── Step 2: Remove invalid points ──
         # Remove any remaining NaN or Inf values

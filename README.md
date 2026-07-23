@@ -1,18 +1,32 @@
-# 🚁 Autonomous Indoor Drone Navigation
+# 🚁 Autonomous Indoor Drone Navigation & Mapping
 
-> **Sensor-based 3D mapping and multi-algorithm path planning for GPS-denied indoor flight using ROS 2, PX4, and Gazebo.**
+> **Frontier-based autonomous exploration with multi-algorithm path planning for GPS-denied indoor flight using ROS 2, PX4, and Gazebo.**
 
-A fully autonomous drone simulation pipeline where a quadcopter **explores** an unknown indoor environment using its depth camera, **builds a persistent 3D map** with OctoMap, and **navigates** collision-free paths using **6 different path planning algorithms** (A\*, Dijkstra, Bellman Ford, PRM, RRT, Theta\*) — all without GPS or prior knowledge of the room layout. Includes a **visual benchmark mode** that runs all algorithms simultaneously, **real-time obstacle avoidance**, and **automated performance comparison**.
+A fully autonomous drone simulation pipeline where a quadcopter **explores unknown indoor environments** using frontier-based exploration, **builds a persistent 3D map** with OctoMap, and **navigates** collision-free paths using **6 different path planning algorithms** (A\*, Dijkstra, Bellman Ford, PRM, RRT, Theta\*). The drone has **zero prior knowledge** of the environment — it discovers rooms, doorways, and obstacles purely through its depth camera. Includes a **visual benchmark mode**, **2.5D altitude planning**, **reactive safety systems**, and **automated performance comparison**.
 
-![3-Room House — Gazebo simulation (left) and OctoMap 3D reconstruction with A* path (right)](Demo_Pic/House_3Room_Navigation.png)
+![Frontier Exploration Complete — Drone autonomously mapped all 3 rooms using frontier-based exploration](Demo_Pic/Frontier1.png)
 
 ---
 
-## 📋 Project Evolution
+## 📋 Project Journey — From Hardware to Full Autonomy
 
-This project grew through progressive problem-solving — each milestone was driven by a real limitation discovered in the previous phase.
+This project evolved through three distinct phases, each driven by real limitations discovered in the previous one. What started as a hardware-focused BTP became a fully autonomous software-defined navigation system.
 
-| Phase | Milestone | What We Learned |
+### Phase 0 → Legacy BTP (Previous Team)
+
+The original team (Aarehant Jain & Shashank Mishra, supervised by Dr. Anuj Grover) built the **hardware foundation**: ultrasonic radar sensors on STM32 microcontrollers and a memory-efficient CNN for obstacle classification. Their work proved that indoor drone navigation was feasible but highlighted the need for a complete software stack.
+
+| Step | What Happened | Key Insight |
+|:---:|:---|:---|
+| 0.1 | Ultrasonic radar on STM32G071 | Single-point distance (1m range, 4.3cm resolution) — not enough for 3D mapping |
+| 0.2 | 4-sensor array on STM32F303RE | Crosstalk issues, still only 4 distance readings vs 307K from a depth camera |
+| 0.3 | CNN on microcontroller (32KB RAM) | Proved edge AI is possible but too constrained for real-time SLAM |
+
+### Phase 1 → Perception & Mapping Pipeline
+
+We shifted to a **software-defined approach** using a depth camera, ROS 2, and OctoMap for dense 3D reconstruction.
+
+| Step | Milestone | What We Learned |
 |:---:|:---|:---|
 | 1 | Environment Setup | Ubuntu 22.04, ROS 2 Humble, PX4 SITL, Gazebo Garden — foundation ready |
 | 2 | Indoor World Design | Custom SDF environments with realistic obstacles |
@@ -21,12 +35,42 @@ This project grew through progressive problem-solving — each milestone was dri
 | 5 | Depth Camera Integration | `x500_depth` with OakD-Lite (640×480 @ 30fps) — gave the drone "eyes" |
 | 6 | Point Cloud Filtering | Voxel Grid + SOR (307K → ~170 pts/frame) — cleaned noisy data |
 | 7 | OctoMap 3D Mapping | Persistent voxel map from depth camera — the drone now "remembers" |
-| 8 | A\* Path Planning | First successful autonomous navigation — but paths were stair-cased |
+| 8 | A\* Path Planning | First successful autonomous navigation on sensor-derived maps |
 | 9 | Multi-Room House | 3 rooms with staggered doorways — tested real indoor complexity |
+
+![Early Perception — Point Cloud + OctoMap in single room environment](Demo_Pic/Screenshot%20from%202026-06-08%2002-15-31.png)
+
+### Phase 2 → Multi-Algorithm Comparison & 2.5D Planning
+
+We implemented **6 path planning algorithms** and built infrastructure to compare them objectively.
+
+| Step | Milestone | What We Learned |
+|:---:|:---|:---|
 | 10 | 4 More Algorithms | PRM, RRT, Theta\*, Dijkstra, Bellman Ford — for comparison |
 | 11 | Visual Benchmark | Run all 6 at once, 6 colored paths in RViz — immediate comparison |
 | 12 | Drone Stability | Velocity clamping + yaw smoothing — smoother, safer flight |
 | 13 | Obstacle Avoidance | Real-time path monitoring + dynamic replanning — safety net |
+| 14 | Ceiling Obstacles | Added fans, hanging light, low pipe — realistic indoor hazards |
+| 15 | 3D OctoMap Query | Voxel hash set for O(1) 3D occupancy checks at any (x,y,z) |
+| 16 | 2.5D Altitude Planning | 3-layer planner (1.2m/1.8m/2.4m) — drone dips under pipes |
+| 17 | Semantic Pipeline | YOLOv8n-seg on GPU → colored OctoMap voxels |
+
+![Multi-Algorithm Benchmark — All 6 paths shown simultaneously](Demo_Pic/Benchmark%201.png)
+
+### Phase 3 → Frontier-Based Autonomous Exploration
+
+The hardcoded scan waypoints from Phase 2 couldn't scale to unknown environments. We replaced them with **frontier-based exploration** — the drone autonomously discovers unexplored regions and maps them.
+
+| Step | Milestone | What We Learned |
+|:---:|:---|:---|
+| 18 | Frontier Extraction | Free cells adjacent to unknown → cluster → score → fly to best |
+| 19 | Reactive Safety | Raw-grid obstacle distance checks (0.25m threshold) prevent crashes |
+| 20 | Stuck Detection | 8s no-movement → blacklist frontier → retreat → try next |
+| 21 | Corner-Cut Fix | Pure Pursuit LOOKAHEAD reduced to 0.3m to prevent wall clipping on turns |
+| 22 | Unknown Space Penalty | Exploration: 3.0 (cross unknown space freely) vs Goal Nav: 50.0 (avoid unmapped walls) |
+| 23 | Complete Room Coverage | MIN_DISTANCE=0.5m, MIN_CLEARANCE=0.3m — no corner left unscanned |
+
+![Frontier Exploration — Drone autonomously mapping through doorways](Demo_Pic/Frontier1.png)
 
 ---
 
@@ -63,14 +107,16 @@ This project grew through progressive problem-solving — each milestone was dri
                     │   Persistent 3D Occupancy Map         │
                     │   Resolution: 10cm | Range: 5m        │
                     └─────────────┬────────────────────────┘
-                                  │
+                                  │ /projected_map
                     ┌─────────────┼────────────────┐
                     ▼                              ▼
-          ┌──────────────────┐          ┌──────────────────┐
-          │    RViz2          │          │  Path Planner    │
-          │  3D Visualization │          │  /projected_map  │
-          │  (grey voxels)    │          │  6 algorithms    │
-          └──────────────────┘          └──────────────────┘
+          ┌──────────────────┐          ┌──────────────────────────┐
+          │    RViz2          │          │ Autonomous Navigator     │
+          │  3D Visualization │          │ Frontier Exploration     │
+          │  (OctoMap + Path) │          │ + A* Path Planning       │
+          └──────────────────┘          │ + Reactive Safety        │
+                                        │ + 2.5D Altitude Planning │
+                                        └──────────────────────────┘
 ```
 
 ---
@@ -103,11 +149,7 @@ The initial test environment: a single room with 3 color-coded obstacles. This i
 | 🟠 Orange Wall | Box (2.0×0.3×1.5m) | (-1.5, -1) | Blocks lower corridor |
 | 🟡 Yellow Pillar | Box (0.6×0.6×2.5m) | (2, 0) | Forces weaving maneuver |
 
-![Single Room Environment — 10×8m with 3 obstacles and A* navigation path](Demo_Pic/Autonomous_AStar_Nav.png)
-
-**Why we moved past this:** A single room didn't test doorway navigation or multi-room planning. We needed a more realistic environment.
-
----
+![Single Room — A* path navigating around obstacles](Demo_Pic/Autonomous_AStar_Nav.png)
 
 ### Environment 2 — 3-Room House (18×12×3m)
 
@@ -135,15 +177,21 @@ A realistic multi-room house that tests the drone's ability to **explore through
 **Key features:**
 - **12 furniture obstacles** across 3 rooms (sofa, bed, desk, bookshelf, wardrobe, etc.)
 - **Staggered doorways** — Door 1 at Y=+2, Door 2 at Y=-2, forcing zig-zag paths
-- **13 scan waypoints** — drone systematically explores all rooms through both doorways
+- **Ceiling obstacles** — fans, hanging light, low pipe for 2.5D altitude testing
 
-![3-Room House — Gazebo view (left) showing staggered doorways and furniture, RViz OctoMap (right) with path navigating through rooms](Demo_Pic/House_3Room_Navigation.png)
+![3-Room House — Gazebo view with staggered doorways and furniture](Demo_Pic/House_3Room_Navigation.png)
 
 ---
 
-## 🧠 Autonomous Navigation — How It Works
+## 🧠 Autonomous Exploration — How It Works
 
-The drone does **not** know the room layout in advance. It discovers obstacles using its depth camera and OctoMap, then plans collision-free paths on the **sensor-derived map**.
+The drone has **zero prior knowledge** of the environment. It uses **frontier-based exploration** to autonomously discover and map every room.
+
+### What is a Frontier?
+
+A **frontier cell** is a free (explored, safe) cell that has at least one **unknown** (unexplored) neighbor. Frontiers represent the **boundary between mapped and unmapped space** — the edge of the drone's knowledge.
+
+### Exploration State Machine
 
 ```
                     ┌──────────────────┐
@@ -152,64 +200,168 @@ The drone does **not** know the room layout in advance. It discovers obstacles u
                     └───────┬──────────┘
                             ▼
                     ┌──────────────────┐
-                    │  2. EXPLORE      │
-                    │  Fly to 13 scan  │──── Depth camera feeds ────┐
-                    │  positions,      │                            ▼
-                    │  rotate 360° at  │                   ┌─────────────────┐
-                    │  each            │                   │  OctoMap Server  │
-                    └───────┬──────────┘                   │  Builds 3D map  │
-                            ▼                              │  from sensor     │
-                    ┌──────────────────┐                   │  data            │
-                    │  3. READY        │                   └────────┬────────┘
-                    │  Hovering, map   │                            │
-                    │  built           │                            ▼
-                    └───────┬──────────┘                   ┌─────────────────┐
-                            │ User clicks                  │ /projected_map  │
-                            │ 2D Goal Pose                 │ (OccupancyGrid) │
-                            ▼                              └────────┬────────┘
-                    ┌──────────────────┐                            │
-                    │  4. NAVIGATE     │◄── Planner runs on ────────┘
-                    │  Follow path     │    real sensor map
-                    │  to destination  │
-                    │                  │◄── Obstacle avoidance:
-                    │  (with real-time │    monitors path every 2s,
-                    │   replanning)    │    replans if blocked
+                    │  2. FINDING      │◄──────────────────────────┐
+                    │  Extract frontier│                           │
+                    │  clusters from   │      ┌─────────────────┐  │
+                    │  /projected_map  │      │ OctoMap Server  │  │
+                    │  Score: size ×   │◄─────│ Builds 3D map   │  │
+                    │  1/distance      │      │ from depth cam  │  │
+                    └───────┬──────────┘      └─────────────────┘  │
+                            ▼                                      │
+                    ┌──────────────────┐                           │
+                    │  3. FLYING       │                           │
+                    │  A* path to best │                           │
+                    │  frontier target │                           │
+                    │                  │                           │
+                    │  Safety checks:  │                           │
+                    │  • Reactive 0.25m│                           │
+                    │  • Stuck 8s      │                           │
+                    │  • Path blocked  │                           │
+                    └───────┬──────────┘                           │
+                            ▼                                      │
+                    ┌──────────────────┐                           │
+                    │  4. SCANNING     │                           │
+                    │  360° rotation   │───────────────────────────┘
+                    │  at frontier     │
+                    │  (full depth     │
+                    │   camera sweep)  │
+                    └──────────────────┘
+
+              When no frontiers remain:
+                    ┌──────────────────┐
+                    │  5. READY        │
+                    │  Map complete!   │
+                    │  Click 2D Goal   │───── User Navigation Phase
+                    │  Pose in RViz    │      (A* with unknown_penalty=50)
                     └──────────────────┘
 ```
 
-### Exploration Phase
-After takeoff, the drone autonomously visits **13 scan positions** spread across all 3 rooms. At each position, it performs a full **360° rotation** so the depth camera captures obstacles from every angle. The route goes: **Bedroom → Living Room → back through Bedroom → Study Room**.
+### Frontier Scoring
 
-### Sensor-Derived Path Planning
-When the user sets a target via RViz's `2D Goal Pose`, the selected path planning algorithm runs on OctoMap's `/projected_map` — the real 2D projection of sensor-discovered obstacles. Obstacles are inflated by **0.25m** for safety clearance.
+Each frontier cluster is scored to prioritize the most valuable exploration target:
 
-### Flight Stability
-All navigators use **velocity clamping** (max 1.5m target delta) and **yaw smoothing** (angular interpolation) to prevent overshooting and jerky turns during waypoint following.
+```
+score = (cluster_size ^ 1.5) / (distance_to_drone ^ 0.2)
+```
 
-### Real-Time Obstacle Avoidance
-During navigation, the drone **checks the latest OctoMap every 2 seconds** for new obstacles on the upcoming path. If a waypoint is now blocked (e.g., an object was moved into the path), the drone **hovers in place** and **replans from its current position** to the same destination using the updated map.
+- **Large clusters** (lots of unexplored space behind them) are strongly preferred
+- **Distance** has a weak penalty — the drone won't avoid far frontiers just because they're distant
+- **Safety-aware target selection**: within each cluster, the drone picks the cell that is both close to the centroid AND far from obstacles
 
-### Coordinate Bridge
-The planner outputs waypoints in Gazebo ENU coordinates. A relative-delta conversion translates these to PX4 NED setpoints, making the system independent of coordinate origin mismatches.
+### Safety Systems
+
+| System | Trigger | Action |
+|:---|:---|:---|
+| **Reactive Safety** | Drone within 0.25m of a real wall | Blacklist frontier + retreat to last safe waypoint |
+| **Stuck Detection** | No movement for 8 seconds | Blacklist frontier + retreat + find new target |
+| **Path Blocked** | Dynamic obstacle on path ahead | Abort path + replan from current position |
+| **Replan Limiter** | 3+ replans in 10 seconds | Blacklist frontier to prevent infinite loops |
+| **Wall-Proximity Cost** | Cells near walls cost more to traverse | A\* naturally centers paths in corridors |
+| **Obstacle Inflation** | 0.40m safety margin around all walls | Drone keeps physical clearance at all times |
+
+### Two Modes of Unknown Space
+
+The planner treats unmapped space differently depending on the context:
+
+| Mode | Unknown Penalty | Why |
+|:---|:---:|:---|
+| **Exploration** | 3.0 | Drone must cross unknown space to discover new rooms |
+| **Goal Navigation** | 50.0 | Unmapped walls are impassable — prevents flying through unscanned walls |
 
 ---
 
-## 💡 Design Decisions
+## 📊 Path Planning Algorithm Comparison
 
-### Why OctoMap instead of RTAB-Map?
+All 6 algorithms run on the **same OctoMap-derived sensor map**. The drone explores identically; only the path planning strategy differs.
 
-While **RTAB-Map** (Real-Time Appearance-Based Mapping) offers loop closure and dense RGB-D reconstruction, it requires heavy CPU/GPU resources — especially when running alongside Gazebo, PX4 SITL, and 8 concurrent processes on a laptop. OctoMap provides sufficient 3D mapping fidelity for obstacle avoidance without the overhead of a full visual SLAM pipeline.
+### Algorithm Paths (Same Environment)
 
-### Why not Ultrasonic Sensors?
+![A* — Grid-locked 45°/90° path through doorways](Demo_Pic/astar.png)
 
-The drone's OakD-Lite depth camera captures **307,200 distance points per frame** (equivalent to 307K ultrasonic sensors). A single camera provides complete 3D scene geometry, whereas ultrasonic sensors give only a single distance value in a narrow 15° cone. The depth camera enables dense 3D reconstruction; ultrasonics can only do simple proximity alerts.
+![PRM — Random sample nodes connected by straight-line edges](Demo_Pic/prm.png)
 
-### Real-World Transferability
+![RRT — Tree grown from start with random exploration](Demo_Pic/rrt.png)
 
-This system is designed for real-world deployment:
-- The planner uses **only sensor data** — no hardcoded room geometry
-- Replace Gazebo with a real depth camera + localization (Vicon, T265, or VIO), and the same code works
-- The scan waypoints can be replaced with **frontier-based exploration** for truly unknown environments
+![Theta* — Smooth any-angle shortcuts through line-of-sight checks](Demo_Pic/theta.png)
+
+### Algorithm Details
+
+| Algorithm | Type | How It Works |
+|:---|:---|:---|
+| **A\*** | Grid-based | f = g + h heuristic search on 8-connected grid. Staircase paths but fast and reliable. |
+| **Dijkstra** | Grid-based | A\* without heuristic (f = g only). Same path, 2-3× more nodes explored. |
+| **Bellman Ford** | Edge relaxation | V-1 iterations over all edges. Same path as Dijkstra but 30-50× slower. |
+| **PRM** | Sampling-based | Scatters 600 random points, connects neighbors with collision-free lines. |
+| **RRT** | Sampling-based | Grows a tree from start by random sampling. Fastest first-path, but jagged. |
+| **Theta\*** | Any-angle | A\* extension with line-of-sight checks. Smoothest, shortest true geometric paths. |
+
+### Benchmark Results
+
+| Property | A\* | Dijkstra | Bellman Ford | PRM | RRT | Theta\* |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Optimal Path?** | ✅ Grid-optimal | ✅ Grid-optimal | ✅ Grid-optimal | ❌ Approximate | ❌ Non-optimal | ✅ True shortest |
+| **Path Smoothness** | ⭐⭐ Staircase | ⭐⭐ Staircase | ⭐⭐ Staircase | ⭐⭐⭐ Straight segments | ⭐ Jagged | ⭐⭐⭐⭐ Smoothest |
+| **Deterministic?** | ✅ Always same | ✅ Always same | ✅ Always same | ❌ Random each run | ❌ Random each run | ✅ Always same |
+| **Narrow Passages** | ✅ Handles well | ✅ Handles well | ✅ Handles well | ⚠️ Needs seeding | ⚠️ Needs goal bias | ✅ Handles well |
+| **Planning Speed** | ~60ms | ~100-190ms | ~2500ms | ~80-160ms | ~14ms (fastest) | ~400ms |
+| **Nodes Explored** | ~8K | ~13K | ~335K edges | ~600 samples | ~200 tree nodes | ~7K |
+| **Best For** | Reliable baseline | Understanding A\* | Negative-weight graphs | Large open spaces | Quick exploration | **Drone flight** |
+
+### Visual Benchmark Mode
+
+The benchmark mode (`--algo benchmark`) runs all 6 algorithms simultaneously:
+
+🔴 A\* — Red | 🟢 Dijkstra — Green | 🟡 Bellman Ford — Yellow | 🔵 PRM — Blue | 🟣 RRT — Magenta | ⚪ Theta\* — Cyan
+
+![Visual Benchmark — All 6 paths simultaneously](Demo_Pic/Benchmark%201.png)
+
+![Visual Benchmark — Different goal](Demo_Pic/Benchmark%202.png)
+
+---
+
+## 🏆 Final Verdict: Best Algorithms for Indoor Drone Navigation
+
+### 🥇 Theta\* — Best Overall for Path Quality
+
+**Theta\* produces the shortest true geometric paths** — not locked to grid angles. Paths are smooth with minimal turns, ideal for drones that need gradual heading changes. Deterministic and handles narrow passages naturally.
+
+### 🥈 A\* — Best for Autonomous Exploration
+
+**A\* is used for the frontier-based exploration phase** because it evaluates the cost of every single cell it traverses, which means it properly respects the wall-proximity cost map and naturally forces the drone into corridor centers. Theta\*'s line-of-sight shortcuts skip intermediate cells, which can cause corner-cutting in tight indoor spaces.
+
+| Environment | Best Choice | Why |
+|:---|:---|:---|
+| **Autonomous exploration (unknown rooms)** | **A\*** | Respects wall-proximity costs, no corner-cutting |
+| **Goal navigation (mapped rooms)** | **Theta\*** | Smooth, shortest paths once the map is built |
+| **Large open spaces (outdoor/warehouse)** | **PRM** | Efficient for large free-space areas |
+| **Unknown/rapidly changing environment** | **RRT** | Fastest first-path discovery |
+| **Academic comparison only** | **Dijkstra / Bellman Ford** | Same paths as A\* but slower |
+
+---
+
+## 🏔️ 2.5D Altitude-Aware Navigation
+
+### The Problem
+Fixed-altitude flight (1.8m) will collide with ceiling-height obstacles. Real indoor environments have fans, hanging lights, and exposed pipes.
+
+### Ceiling Obstacles
+
+| Obstacle | Location | Height | Purpose |
+|:---|:---|:---|:---|
+| Ceiling Fan (Bedroom) | (0, 0) | z = 2.55m | OctoMap 3D capture test |
+| Ceiling Fan (Living Room) | (-6, 1) | z = 2.55m | In cross-room flight path |
+| Hanging Light (Door 1) | (-3, 2) | z = 2.05m | Altitude awareness near doorways |
+| **Low Pipe (Study Room)** | **(6, 0)** | **z = 1.9m** | **Critical: exactly at drone altitude** |
+
+### 3 Altitude Layers
+
+```
+Layer 2:  z = 2.4m  ─── High (above most furniture, below ceiling)
+Layer 1:  z = 1.8m  ─── Default flight altitude
+Layer 0:  z = 1.2m  ─── Low (under hanging obstacles)
+```
+
+The planner runs A\* on a **layered graph** where nodes connect horizontally (8 directions, same layer) and vertically (altitude transitions). When encountering the low pipe at z=1.9m, the planner routes through Layer 0 to fly **under** it.
 
 ---
 
@@ -231,25 +383,44 @@ OctoMap builds a **persistent 3D memory** from the filtered point cloud:
 - Each voxel: **Occupied** (obstacle), **Free** (safe), or **Unknown** (unseen)
 - The map **never forgets** — turning away from an obstacle doesn't erase it
 
-The TF Broadcaster provides the camera's position in the world (`map → base_link → camera_frame`) so OctoMap knows where each depth frame was captured.
+---
 
-![Early-stage OctoMap visualization — Filtered point cloud and voxel grid (single room environment)](Demo_Pic/Screenshot%20from%202026-06-08%2002-15-31.png)
+## 💡 Key Design Decisions
+
+### Why Frontier-Based Exploration?
+
+Hardcoded scan waypoints worked for known environments but can't scale to truly unknown spaces. Frontier-based exploration treats every deployment as if it's the first time — the drone discovers room layouts, doorways, and obstacles entirely through its sensors.
+
+### Why A\* for Exploration (not Theta\*)?
+
+During evaluation, Theta\*'s line-of-sight shortcuts were **cutting corners too tightly** in narrow indoor spaces. The shortcut calculation checked start and end points but skipped the wall-proximity costs of intermediate cells, causing the drone to graze walls. A\* evaluates every cell individually, so it properly respects the wall-cost map and naturally centers paths in corridors.
+
+### Why OctoMap instead of RTAB-Map?
+
+RTAB-Map offers loop closure and dense RGB-D reconstruction, but requires heavy CPU/GPU resources — especially alongside Gazebo, PX4 SITL, and 8 concurrent processes. OctoMap provides sufficient 3D mapping fidelity for obstacle avoidance without full visual SLAM overhead.
+
+### Dual Unknown-Space Penalty
+
+A single penalty value doesn't work for both exploration and navigation:
+- **Exploration** needs to cross unknown space (penalty = 3.0)
+- **Goal navigation** must never route through unmapped walls (penalty = 50.0)
 
 ---
 
-## 📂 Project Files
+## 📂 Project Structure
 
 | File | Description |
 |:---|:---|
 | `launch_sim.sh` | One-command launcher — opens 8 coordinated terminals |
 | **planners/** | |
-| `planners/navigator_astar.py` | **A\*** — Grid-based search with f=g+h heuristic |
+| `planners/navigator_astar.py` | **A\*** — Frontier exploration + goal navigation + safety systems |
 | `planners/navigator_dijkstra.py` | **Dijkstra** — A\* without heuristic (uniform cost) |
 | `planners/navigator_bellman_ford.py` | **Bellman Ford** — Edge relaxation (V-1 iterations) |
 | `planners/navigator_prm.py` | **PRM** — Probabilistic Roadmap with Dijkstra search |
 | `planners/navigator_rrt.py` | **RRT** — Rapidly-exploring Random Tree |
 | `planners/navigator_theta_star.py` | **Theta\*** — Any-angle A\* with line-of-sight shortcuts |
 | `planners/navigator_benchmark.py` | **Visual Benchmark** — Runs all 6, shows colored paths |
+| `planners/planner_3d.py` | **2.5D Multi-Layer Planner** — Altitude-aware A\* |
 | **benchmark/** | |
 | `benchmark/save_map.py` | Saves OctoMap to disk for offline benchmarking |
 | `benchmark/planner_library.py` | All 6 algorithms as pure functions (no ROS deps) |
@@ -259,12 +430,17 @@ The TF Broadcaster provides the camera's position in the world (`map → base_li
 | `core/pointcloud_filter.py` | Voxel Grid + SOR filter node (307K → 170 points) |
 | `core/tf_broadcaster.py` | Publishes drone position as TF transforms for OctoMap |
 | `core/room_scanner.py` | Automated room scanning flight patterns |
+| `core/octomap_3d_query.py` | 3D voxel hash set for O(1) occupancy lookups |
+| `core/semantic_pointcloud.py` | YOLOv8n-seg semantic segmentation pipeline |
 | **worlds/** | |
 | `worlds/house_3room.sdf` | **Active world** — 3-room house (18×12m) with furniture |
 | `worlds/indoor_10x8x3.sdf` | Legacy world — single room (10×8m) with 3 obstacles |
 | **config/** | |
-| `config/drone_rviz.rviz` | RViz2 config — OctoMap (grey) + paths (colored) |
+| `config/drone_rviz.rviz` | RViz2 config — OctoMap + paths + frontier visualization |
 | `config/octomap_params.yaml` | OctoMap server configuration |
+| **docs/** | |
+| `docs/BTP_report__winter2026.pdf` | Original BTP report (hardware phase) |
+| `docs/algorithm_comparison_plan.md` | Algorithm evaluation methodology |
 
 ---
 
@@ -304,21 +480,21 @@ cd ~/px4_ros_ws && source /opt/ros/humble/setup.bash && colcon build
 
 # 7. This Repository
 cd ~/Desktop
-git clone https://github.com/ami4go/Indoor-Drone-Navigation.git Drone_IP
+git clone https://github.com/shashank22603/ROS.git Drone_IP
 chmod +x ~/Desktop/Drone_IP/launch_sim.sh
 ```
 
 ### Launch
 
 ```bash
+# Autonomous frontier exploration (recommended):
+~/Desktop/Drone_IP/launch_sim.sh --auto
+
 # Manual flight (keyboard control):
 ~/Desktop/Drone_IP/launch_sim.sh
 
-# Autonomous mode (default A*):
-~/Desktop/Drone_IP/launch_sim.sh --auto
-
 # Choose a specific algorithm:
-~/Desktop/Drone_IP/launch_sim.sh --auto --algo astar      # A*
+~/Desktop/Drone_IP/launch_sim.sh --auto --algo astar      # A* (default)
 ~/Desktop/Drone_IP/launch_sim.sh --auto --algo dijkstra    # Dijkstra
 ~/Desktop/Drone_IP/launch_sim.sh --auto --algo bellman     # Bellman Ford
 ~/Desktop/Drone_IP/launch_sim.sh --auto --algo prm         # Probabilistic Roadmap
@@ -333,10 +509,10 @@ chmod +x ~/Desktop/Drone_IP/launch_sim.sh
 |:---:|:---|:---|
 | T1 | Micro-XRCE-DDS Agent | PX4 ↔ ROS 2 communication |
 | T2 | PX4 + Gazebo | Flight controller + 3D simulation |
-| T3 | Controller | Keyboard (manual) or Path Planner (auto) |
+| T3 | Controller | Keyboard (manual) or Autonomous Navigator (auto) |
 | T4 | GZ-ROS2 Bridge | Bridges depth camera + pose to ROS 2 |
 | T5 | Point Cloud Filter | Cleans raw depth data in real-time |
-| T6 | RViz2 | 3D visualization (grey OctoMap + colored paths) |
+| T6 | RViz2 | 3D visualization (OctoMap + paths) |
 | T7 | TF Broadcaster | Drone-to-map coordinate transforms |
 | T8 | OctoMap Server | Builds persistent 3D occupancy map |
 
@@ -357,136 +533,22 @@ chmod +x ~/Desktop/Drone_IP/launch_sim.sh
 
 ### Full System View
 
-![Full System — Gazebo + RViz + Terminal running together](Demo_Pic/Ref.png)
+![Full System — Gazebo + RViz + Terminal](Demo_Pic/Ref.png)
 
-### Individual Algorithm Paths
+### Path Planning Visualization
 
-These screenshots show each algorithm's path on the same 3-room house, navigating from Bedroom to Study Room through the doorways.
+![Path planning through multi-room house](Demo_Pic/Path%201.png)
 
-![Individual path planning — algorithm navigating through the 3-room house](Demo_Pic/Path%201.png)
-
-![Individual path planning — different goal showing algorithm path characteristics](Demo_Pic/Path%202.png)
+![Different goal showing algorithm characteristics](Demo_Pic/Path%202.png)
 
 ---
 
-## 📊 Path Planning Algorithm Comparison
+## 👤 Authors
 
-All 6 algorithms run on the **same OctoMap-derived sensor map** of the 3-room house. The drone explores the environment identically; only the path planning strategy differs.
+- **Amit Kumar** — Software architecture, autonomous navigation, path planning, frontier exploration
+- **Shashank Mishra** — Hardware foundation, sensor integration (BTP Phase)
 
-### Phase 1 Algorithms (Grid & Sampling Based)
-
-#### A\* (Grid-Based Search)
-
-![A* path planning — grid-locked 45°/90° path through doorways](Demo_Pic/astar.png)
-
-- **Guarantees the shortest grid-optimal path** using f = g + h heuristic
-- Paths follow the 8-connected grid (45° and 90° turns only)
-- Fast and reliable — the baseline algorithm for all comparisons
-
-#### PRM (Probabilistic Roadmap)
-
-![PRM path planning — random sample nodes connected by straight-line edges](Demo_Pic/prm.png)
-
-- **Scatters 600 random points** in free space, then connects neighbors with collision-free lines
-- Produces **straight-line segments** between sample nodes (not grid-locked)
-- Extra samples are seeded near doorways to handle narrow passage connectivity
-
-#### RRT (Rapidly-exploring Random Tree)
-
-![RRT path planning — tree grown from start with random exploration](Demo_Pic/rrt.png)
-
-- **Grows a tree from start** by randomly sampling and extending toward free space
-- Fastest to find *a* path, but the result is **jagged with sharp turns**
-- Path simplification removes redundant waypoints, but the drone may still clip corners
-
-#### Theta\* (Any-Angle A\*)
-
-![Theta* path planning — smooth any-angle shortcuts through line-of-sight checks](Demo_Pic/theta.png)
-
-- **Extension of A\*** that checks line-of-sight between grandparent and current node
-- Produces the **smoothest, shortest paths** — true geometric shortest route at any angle
-- Uses Bresenham's line algorithm to verify obstacle-free straight lines
-
-### Phase 2 Algorithms (Added for Comparison)
-
-#### Dijkstra (Uniform Cost Search)
-
-- **A\* without the heuristic** — priority is `f = g` only (no estimated distance to goal)
-- Explores uniformly in all directions like a spreading circle
-- Produces the **exact same path as A\***, but explores ~2-3x more nodes because there's no guidance toward the goal
-- Educational value: clearly demonstrates **why the heuristic matters**
-
-#### Bellman Ford (Edge Relaxation)
-
-- Iterates over **all edges V-1 times**, relaxing each one
-- Designed for graphs with **negative edge weights** (our grid has only positive weights)
-- On positive-weight grids, produces the **same path as Dijkstra but 30-50x slower**
-- With bounded search region and early termination, still takes ~2500ms vs Dijkstra's ~80ms
-
-### Visual Benchmark Mode
-
-The benchmark mode (`--algo benchmark`) runs **all 6 algorithms simultaneously** when you click a goal, displaying all paths at once with different colors in RViz:
-
-🔴 A\* — Red | 🟢 Dijkstra — Green | 🟡 Bellman Ford — Yellow | 🔵 PRM — Blue | 🟣 RRT — Magenta | ⚪ Theta\* — Cyan
-
-![Visual Benchmark — All 6 algorithm paths displayed simultaneously with metrics table](Demo_Pic/Benchmark%201.png)
-
-![Visual Benchmark — Different goal showing how algorithms diverge on longer paths](Demo_Pic/Benchmark%202.png)
-
-The drone flies the **Theta\* path** (smoothest), while all 6 paths remain visible for visual comparison. The terminal prints a comparison table with planning time, path length, waypoint count, nodes explored, and smoothness angle.
-
----
-
-## 📈 Algorithm Comparison Summary
-
-| Property | A\* | Dijkstra | Bellman Ford | PRM | RRT | Theta\* |
-|:---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Optimal Path?** | ✅ Grid-optimal | ✅ Grid-optimal | ✅ Grid-optimal | ❌ Approximate | ❌ Non-optimal | ✅ True shortest |
-| **Path Smoothness** | ⭐⭐ Staircase | ⭐⭐ Staircase | ⭐⭐ Staircase | ⭐⭐⭐ Straight segments | ⭐ Jagged | ⭐⭐⭐⭐ Smoothest |
-| **Deterministic?** | ✅ Always same | ✅ Always same | ✅ Always same | ❌ Random each run | ❌ Random each run | ✅ Always same |
-| **Narrow Passages** | ✅ Handles well | ✅ Handles well | ✅ Handles well | ⚠️ Needs seeding | ⚠️ Needs goal bias | ✅ Handles well |
-| **Planning Speed** | ~60ms | ~100-190ms | ~2500ms | ~80-160ms | ~14ms (fastest) | ~400ms |
-| **Nodes Explored** | ~8K | ~13K | ~335K edges | ~600 samples | ~200 tree nodes | ~7K |
-| **Best For** | Reliable baseline | Understanding A\* | Negative-weight graphs | Large open spaces | Quick exploration | **Drone flight** |
-
----
-
-## 🏆 Final Verdict: Best Algorithms for Indoor Drone Navigation
-
-### 🥇 Theta\* — Best Overall for Indoor Drones
-
-**Theta\* is the clear winner for indoor drone navigation.**
-
-- Produces the **shortest true geometric path** (not locked to grid angles)
-- Paths are **smooth with minimal turns** — ideal for a drone that needs gradual heading changes
-- **Deterministic** — same input always gives the same output, critical for safety-critical applications
-- Handles **narrow passages (doorways)** naturally without special seeding
-- Moderate planning time (~400ms) is acceptable for non-real-time replanning
-
-### 🥈 A\* — Best Reliable Fallback
-
-**A\* is the safest, most predictable choice.**
-
-- **Fast** (~60ms), **deterministic**, and **always finds the optimal grid path**
-- Staircase paths are suboptimal for drones but work well with enough waypoint density
-- Best choice when computation budget is tight or when simplicity matters
-- The foundation that all other algorithms are compared against
-
-### When to Use Each Algorithm
-
-| Environment | Best Choice | Why |
-|:---|:---|:---|
-| **Indoor (small rooms, doorways)** | **Theta\*** | Smooth paths, handles narrow passages, optimal |
-| **Indoor (quick replanning needed)** | **A\*** | Fast, deterministic, reliable fallback |
-| **Large open spaces (outdoor/warehouse)** | **PRM** | Efficient for large free-space areas, multi-query |
-| **Unknown/rapidly changing environment** | **RRT** | Fastest first-path discovery, good for exploration |
-| **Academic comparison only** | **Dijkstra / Bellman Ford** | Same paths as A\* but slower — demonstrates algorithmic principles |
-
----
-
-## 👤 Author
-
-**Amit**
+**Advisor:** Dr. Anuj Grover, IIIT Delhi
 
 ---
 

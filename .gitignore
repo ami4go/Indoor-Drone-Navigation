@@ -21,3 +21,11 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+# Large model weights
+yolov8n-seg.pt
+
+# AI assistant config
+CLAUDE.md
+.claude/
+IMPLEMENTATION_PLAN.md

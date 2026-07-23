@@ -670,7 +670,6 @@ The YOLOv8 semantic segmentation pipeline is implemented but not yet integrated 
 ## 👤 Authors
 
 - **Amit Kumar** — Software architecture, autonomous navigation, path planning, frontier exploration
-- **Shashank Mishra** — Hardware foundation, sensor integration (BTP Phase)
 
 **Advisor:** Dr. Anuj Grover, IIIT Delhi
 

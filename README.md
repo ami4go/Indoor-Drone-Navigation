@@ -165,6 +165,8 @@ The hardcoded scan waypoints from Phase 2 worked for known environments but coul
 
 ## 🔍 Frontier-Based Autonomous Exploration
 
+![Frontier Exploration Complete — Drone autonomously mapped all 3 rooms using frontier-based exploration](Demo_Pic/Frontier1.png)
+
 ### The Problem
 
 In early phases, the drone visited **hardcoded scan waypoints** — fixed positions manually placed in each room. This worked for known environments but completely fails in the real world where the room layout is unknown. A drone deployed in a new building has no idea where rooms, doorways, or corridors are.
@@ -573,6 +575,10 @@ chmod +x ~/Desktop/Drone_IP/launch_sim.sh
 ### Full System View
 
 ![Full System — Gazebo + RViz + Terminal running together](Demo_Pic/Ref.png)
+
+### Frontier-Based Exploration
+
+![Frontier Exploration — Drone autonomously mapped all 3 rooms](Demo_Pic/Frontier1.png)
 
 ### Path Planning Visualization
 

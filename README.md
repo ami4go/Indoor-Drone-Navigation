@@ -586,6 +586,9 @@ chmod +x ~/Desktop/Drone_IP/launch_sim.sh
 
 ![Different goal showing path characteristics](Demo_Pic/Path%202.png)
 
+## 🎥 Demo Video
+
+▶️ **[Watch the Project Demo](https://drive.google.com/file/d/1a-23VZDHl5JLSbBHlPiDTkjdHGUF5ik8/view?usp=drive_link)**
 ---
 
 ## 💡 Key Design Decisions

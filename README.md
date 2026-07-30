@@ -21,7 +21,7 @@ The drone uses its depth camera as its only sensor. It discovers rooms, doorways
 - [Perception Pipeline](#-perception-pipeline)
 - [Simulation Environments](#-simulation-environments)
 - [Installation & Setup](#-installation--setup)
-- [Demo Gallery](#-demo-gallery)
+- [Demo Gallery & Video Demo](#-demo-gallery)
 - [Design Decisions](#-key-design-decisions)
 - [Future Improvements](#-future-improvements)
 - [Authors](#-authors)
